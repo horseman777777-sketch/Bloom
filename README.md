@@ -95,6 +95,10 @@ Answers come from the Claude Code or Codex CLI you have installed and signed in 
 - **Quick AI**: type in the search line and press **Tab** to open AI chat there; Shift+Tab starts a new chat. Choose the model and thinking level.
   - Esc goes back home and the answer keeps going; the search line shows it and Tab takes you back. ■ Stop (or Ctrl+.) stops it.
   - A click outside closes the launcher, as in the other views; the Win key opens it again at the same chat. 📌 keeps it above other windows instead.
+- **Ready before you ask**: when a chat is open or you start typing, Bloom starts the AI for the model that chat uses (Claude or ChatGPT, never both), so your first message doesn't wait for it. It ends after a few minutes unused or when the chat closes.
+- **ChatGPT answers as they're written**: ChatGPT chats (the chat window and the launcher's quick chat) show the answer as it is written, not all at once at the end, and keep one Codex process per chat.
+  - Bloom's Codex runs with its own settings, so your own Codex `config.toml` doesn't change Bloom's chats; your Codex sign-in and earlier chats carry over.
+  - The first ChatGPT chat after updating can take longer to start while Codex indexes your history once.
 - **AI chat window** (Ctrl+Alt+C)
   - Continue past chats and keep them in groups (folders).
   - Attach files and pictures (drag and drop · Ctrl+O · Ctrl+V).
@@ -113,9 +117,11 @@ Answers come from the Claude Code or Codex CLI you have installed and signed in 
 - **AI actions** (Ctrl+Alt+A): in any app, turn the selected text (or the clipboard when nothing is selected) into something else and paste it back.
   - Summarize · translate · fix spelling · polish · shorter · longer · formal · casual · key points as a list · explain simply · draft a reply
   - Or write your own instruction.
-- **Usage**: the home shows Claude's and ChatGPT's 5-hour and weekly limits, as used or as left, refreshed every 5 or 10 minutes. Several accounts of each are supported (Settings › AI accounts): each one signs in with the CLI's own login, and AI chat uses the account you pick. Nothing switches accounts on its own.- **Work notifications**: a card in a screen corner and a sound when a Claude Code or Codex task starts, finishes, waits for approval, or nears or regains its usage limit. Click a task's card to go to the terminal or editor window it runs in.
+- **Usage**: the home shows Claude's and ChatGPT's 5-hour and weekly limits, as used or as left, refreshed every 5 or 10 minutes. Several accounts of each are supported (Settings › AI accounts): each one signs in with the CLI's own login, and AI chat uses the account you pick. Nothing switches accounts on its own.
+- **Work notifications**: a card in a screen corner and a sound when a Claude Code or Codex task starts, finishes, waits for approval, or nears or regains its usage limit. Click a task's card to go to the terminal or editor window it runs in.
   - Pick one of six positions, the size, the sound and which events.
   - Notifications are hidden during full-screen games and presentations.
+  - **Approve on the card** (Settings › Notifications, off by default): when Claude Code asks for permission, its card offers Allow, Decline and Answer in terminal. Turning it on adds Bloom's hook to Claude Code's `settings.json`; turning it off takes it out. While the session's window is in front, the terminal asks as before.
 
 ### On the screen — Bloom Lens · color picker
 
@@ -127,12 +133,20 @@ Answers come from the Claude Code or Codex CLI you have installed and signed in 
   - `3` Copy its text (Windows OCR)
   - `4` Translate live: Bloom keeps reading the area and translates it whenever it changes.
   - `5` Pin to the screen: the area stays on top as a picture. Drag it, size it with the wheel, Esc closes it.
-  - `6` Capture: the area goes to the clipboard as a picture, ready for Ctrl+V.
+  - `6` Capture: the area goes to the clipboard as a picture, ready for Ctrl+V. Captures are also saved in your Screenshots folder, where Windows' Snipping Tool saves them, as "Bloom <date> <time>.png"; Bloom never deletes anything there.
+  - `7` Color palette: the main colors of the area (see below).
   - Translate (Ctrl+Alt+T) and copy text (Ctrl+Alt+O) have shortcuts of their own.
 - **Color picker**: take a color from the screen with the magnifier, or paste a color code.
   - See HEX · RGB · HSL and its contrast with white and black text.
   - Get gradients made from the color (copied as CSS).
   - Recent colors are kept.
+- **Color palette** (Lens `7`, or the palette button on the capture's drawing bar): picks the main colors of the area, 5 by default (− + for 3–10).
+
+<img src="docs/media/en/palette.webp" alt="The color palette of a drawn poster: five swatches with HEX, RGB and share, Copy all, and suggested gradients for the picked color">
+
+  - Each swatch shows HEX, RGB and its share; click to copy the HEX. ← → picks a swatch.
+  - Copy all gives a HEX list, CSS variables or a palette image; a picked color shows gradient suggestions.
+  - Worked out on this PC, with no AI usage. Palettes are kept with the recent colors.
 
 ### Docked tools
 
@@ -155,6 +169,7 @@ Answers come from the Claude Code or Codex CLI you have installed and signed in 
   - Ctrl+P keeps the launcher above other windows when you click elsewhere (📌 shows while it does; in the quick AI, 📌 sits where ⚙ is).
   - Drag the search line (anywhere past the text) or the bottom bar to move it, to another monitor too; double-click either to put it back in the middle.
   - ⚙ at the end of the search line opens the settings (Ctrl+,); in the quick AI, use Ctrl+,.
+  - Drag the launcher's edges and corners to resize it. A bigger launcher shows more, not bigger: text and icons keep their size. The size is kept and fitted to the screen on open; Settings › General resets it.
   - Ctrl+= / Ctrl+- / Ctrl+0 scale Bloom from 80 to 150 % — the launcher, tools, AI chat and settings together.
 
 ### Bloom Space Cleaner
@@ -167,6 +182,18 @@ Shows drive and folder space as a map. Each file and folder occupies a block pro
 - Switch drives or pick a folder to look at.
 - Choose files and folders below drive roots, outside the Windows folder. Restore recycled items from the Recycle Bin.
 
+### Edit the home
+
+<img src="docs/media/en/home.webp" alt="The home of a wide launcher in two columns while it is edited: AI usage, timers and this week on the left, favorites and commands on the right, each block with its own buttons and an Add a block line">
+
+The empty search line shows the home: favorites, AI usage, this week, timers, recently used, commands and more. Ctrl+E (or "Edit home") edits it.
+
+- Drag a block by its title bar to move it; a gap shows where it will land. ▲ ▼ ‹ › move it with the buttons, ✕ hides it.
+- Each list block has its own row count (− +), and clicking a title folds the block.
+- A wide launcher lays the home out in two columns; ‹ › moves a block to the other column. Resize the launcher from its edges (see above).
+- "+ Add block" at the end of each column lists the hidden blocks as cards. Click one to add it at the end of that column, or drag it to where it should go.
+- The AI usage cards can be reordered there too, and each account can show a name of your own instead of its e-mail.
+
 ### Settings and custom commands
 
 <img src="docs/media/en/yours.webp" alt="The Features page of the settings with a switch per feature, and the Performance page with animation, glass and memory">
@@ -177,7 +204,6 @@ Shows drive and folder space as a map. Each file and folder occupies a block pro
   - Chains: lines for the search line, run in turn (`notepad ; volume 30 ; wait 2 ; yt lofi`).
   - Words after the keyword fill the `{input}` spot (`bk D:\photos`).
   - Script files are added from Ctrl+K › Custom commands.
-- **Home** (Ctrl+E): pick the blocks the empty search line shows (favorites · AI usage · this week · timers · recently used · commands …) and their order. The AI usage cards can be reordered there too, and each account can show a name of your own instead of its e-mail.
 - **Features on and off**: disabling a feature (AI chat · Bloom Lens · calculator · timers · color picker · emoji · window switching …) removes it from search results, commands, home and favorites, and releases its shortcut. Saved data is retained.
 - **Look · performance**
   - Dark, light or system theme, and accent color presets
@@ -189,6 +215,7 @@ Shows drive and folder space as a map. Each file and folder occupies a block pro
   - First-run setup covers how to open Bloom, the home and AI features.
   - Export the settings, favorites, app names and browser shortcuts to one file, and import them on another PC.
 - **Problem report**: Settings › About › Problem report copies the version, Windows and the recent log (user name and e-mail addresses hidden) and opens a GitHub issue page. Bloom sends nothing itself.
+- **Stall log**: when Bloom stops responding for half a second or more, its log says so. A freeze past 0.8 s also leaves a small diagnostic file (`%LOCALAPPDATA%\Bloom\stalls`, the newest five, never sent) that shows where Bloom was stuck.
 
 ## Shortcuts
 
@@ -200,6 +227,7 @@ Shows drive and folder space as a map. Each file and folder occupies a block pro
 | `Ctrl+1` … `Ctrl+9` | Favorites |
 | `Ctrl+J` | Tools (notes · timers · calculator · clipboard · shortcuts) |
 | `Ctrl+P` | Keep the launcher on top |
+| `?` | In an empty search line: what Bloom understands, by kind |
 | `Ctrl+E` | Edit the home |
 | `Ctrl+=` · `Ctrl+-` · `Ctrl+0` | Bigger · smaller · 100 % |
 | `Esc` | Back → clear the text → close (the quick AI's answer keeps going) |
@@ -207,6 +235,8 @@ Shows drive and folder space as a map. Each file and folder occupies a block pro
 | `Ctrl+Alt+C` | AI chat window |
 | `Ctrl+Alt+A` | AI actions |
 | `Ctrl+Alt+L` | Bloom Lens |
+| `1` … `7` | In Bloom Lens: ask AI · translate · copy text · live translation · pin · capture · color palette |
+| `← →` · `−` `+` · `Enter` | In the color palette: pick a color · fewer or more colors · copy the HEX |
 | `Ctrl+Alt+T` · `Ctrl+Alt+O` | Translate the screen · copy text from the screen |
 | `Ctrl+Alt+V` | Clipboard history |
 
