@@ -185,6 +185,9 @@ internal static class ScreenGrab
             Glass.ToolWindow(w);
             Win32.SetWindowPos(h, Win32.HWND_TOPMOST, mon.X, mon.Y, mon.Width, mon.Height, Win32.SWP_NOACTIVATE);
         };
+        // moved onto a monitor with another scale, WPF resizes the window by the scale ratio (a 100 % monitor beside a
+        // 150 % one got a 1280x720 overlay on its 1920x1080): cover the monitor again
+        w.DpiChanged += (_, _) => Win32.SetWindowPos(new WindowInteropHelper(w).Handle, Win32.HWND_TOPMOST, mon.X, mon.Y, mon.Width, mon.Height, Win32.SWP_NOACTIVATE);
         w.Loaded += (_, _) =>
         {
             scale = VisualTreeHelper.GetDpi(w).DpiScaleX;
