@@ -108,22 +108,208 @@ internal sealed partial class UserCommands
 
     public static string SnippetText(string body) => body.Replace("\\n", "\n");
 
-    [GeneratedRegex("""["']\{input\}["']""", RegexOptions.IgnoreCase)]
-    private static partial Regex QuotedInputRx();
-
-    private static readonly System.Buffers.SearchValues<char> Specials = System.Buffers.SearchValues.Create(" \t;&|(),'\"");
-
-    /// A script line with {input} as one argument: quoted when it has spaces or signs (PowerShell '…', cmd and programs
-    /// "…"), unless the line already puts quotes around {input}.
+    /// A script line with {input} and {clipboard} put in as DATA, whatever the template wraps around them: the value can
+    /// never end a quote, start a subexpression or a new command. For PowerShell (a .ps1, or a command line) the
+    /// scanner follows the template's own quoting ('…', "…", here-strings, comments, $( )) and writes the value the way
+    /// that spot needs: a bare spot gets a quoted string, a '…' spot gets every ' ‘ ’ ‚ ‛ doubled, a "…" spot gets
+    /// ` $ " “ ” „ escaped with a backtick; line breaks never leave a comment or a here-string. For a .bat, .cmd, .exe
+    /// or .com line the value goes inside "…" with no quote, line break or (for cmd) % in it.
     public static string ScriptLine(string body, string input, Func<string>? clipboard = null, DateTime? now = null)
     {
-        string value = input.Trim();
-        if (value.Length > 0 && !QuotedInputRx().IsMatch(body) && value.AsSpan().IndexOfAny(Specials) >= 0)
+        var t = now ?? DateTime.Now;
+        var map = new Dictionary<string, (string text, bool literal)>(StringComparer.OrdinalIgnoreCase)
         {
-            string ext = Path.GetExtension(SplitFile(Expand(body, "x", null, now).Trim()).file ?? "").ToLowerInvariant();
-            value = ext is ".bat" or ".cmd" or ".exe" or ".com" ? "\"" + value.Replace("\"", "") + "\"" : "'" + value.Replace("'", "''") + "'";
+            ["{input}"] = (input.Trim(), false),
+            ["{date}"] = (t.ToString("yyyy-MM-dd"), true),
+            ["{time}"] = (t.ToString("HH:mm"), true),
+        };
+        if (clipboard is not null && body.Contains("{clipboard}", StringComparison.OrdinalIgnoreCase)) map["{clipboard}"] = (clipboard(), false);
+        string ext = Path.GetExtension(SplitFile(Expand(body, "x", null, t).Trim()).file ?? "").ToLowerInvariant();
+        return ext is ".bat" or ".cmd" or ".exe" or ".com" ? FillProgram(body, map, ext is ".bat" or ".cmd") : FillPowerShell(body, map);
+    }
+
+    /// PowerShell's own quote characters: ' ‘ ’ ‚ ‛ and " “ ” „ (the tokenizer takes each of them as a quote).
+    private static bool IsSingleQuote(char c) => c is '\'' or '\u2018' or '\u2019' or '\u201A' or '\u201B';
+
+    private static bool IsDoubleQuote(char c) => c is '"' or '\u201C' or '\u201D' or '\u201E';
+
+    private static bool IsLineBreak(char c) => c is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029';
+
+    /// The text as one PowerShell single-quoted string: '…' with every single-quote character doubled.
+    public static string PsQuote(string s)
+    {
+        var sb = new System.Text.StringBuilder(s.Length + 2).Append('\'');
+        foreach (char c in s)
+        {
+            sb.Append(c);
+            if (IsSingleQuote(c)) sb.Append(c);
         }
-        return Expand(body, value, clipboard, now);
+        return sb.Append('\'').ToString();
+    }
+
+    private enum Ps { Bare, Single, Double, HereSingle, HereDouble, LineComment, BlockComment }
+
+    private static string NoBreaks(string s)
+    {
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (char c in s) sb.Append(IsLineBreak(c) ? ' ' : c);
+        return sb.ToString();
+    }
+
+    private static string EscapeDouble(string s)
+    {
+        var sb = new System.Text.StringBuilder(s.Length + 8);
+        foreach (char c in s)
+        {
+            if (c is '`' or '$' || IsDoubleQuote(c)) sb.Append('`');
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    /// The value as it must be written at a spot of PowerShell text in state `st`.
+    /// Inside the $( ) of a "…" string PowerShell drops a backtick that stands right before a double-quote character, even
+    /// in a '…' there; one more backtick in front of each such quote keeps the value as it was.
+    private static string KeepBackticks(string s)
+    {
+        if (!s.Contains('`')) return s;
+        var sb = new System.Text.StringBuilder(s.Length + 4);
+        for (int i = 0; i < s.Length; i++)
+        {
+            if (IsDoubleQuote(s[i]) && i > 0 && s[i - 1] == '`') sb.Append('`');
+            sb.Append(s[i]);
+        }
+        return sb.ToString();
+    }
+
+    private static string PsValue(string text, Ps st, char before, char after, bool nested)
+    {
+        if (text.Length == 0) return "";
+        switch (st)
+        {
+            case Ps.Single:
+                return nested ? KeepBackticks(PsQuote(text)[1..^1]) : PsQuote(text)[1..^1];
+            case Ps.Double:
+                return EscapeDouble(text);
+            case Ps.HereSingle:
+                return NoBreaks(text);
+            case Ps.HereDouble:
+                return EscapeDouble(NoBreaks(text));
+            case Ps.LineComment:
+                return NoBreaks(text);
+            case Ps.BlockComment:
+                return text.Replace(">", " ");
+            default:
+                string q = nested ? KeepBackticks(PsQuote(text)) : PsQuote(text);
+                bool alone = (before == '\0' || char.IsWhiteSpace(before) || before is '(' or '=' or ',' or ';' or '|')
+                    && (after == '\0' || char.IsWhiteSpace(after) || after is ')' or ',' or ';' or '|');
+                // inside a word ("a{input}b") PowerShell's argument mode reads a $( ) with its own quirks (it eats the
+                // backtick of `"), so the value goes in as base64, which has no character it could misread
+                return alone ? q : "$([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(text)) + "')))";
+        }
+    }
+
+    private static string? PlaceholderAt(string body, int i, IReadOnlyDictionary<string, (string text, bool literal)> map)
+    {
+        foreach (string key in map.Keys)
+            if (string.Compare(body, i, key, 0, key.Length, StringComparison.OrdinalIgnoreCase) == 0 && i + key.Length <= body.Length) return key;
+        return null;
+    }
+
+    private static string FillPowerShell(string body, IReadOnlyDictionary<string, (string text, bool literal)> map)
+    {
+        var sb = new System.Text.StringBuilder(body.Length + 32);
+        var outer = new Stack<(Ps state, int depth)>();
+        Ps st = Ps.Bare;
+        int depth = 0;
+        for (int i = 0; i < body.Length;)
+        {
+            char c = body[i], n = i + 1 < body.Length ? body[i + 1] : '\0';
+            if (c == '{' && PlaceholderAt(body, i, map) is { } key)
+            {
+                var (text, literal) = map[key];
+                int end = i + key.Length;
+                sb.Append(literal ? text : PsValue(text, st, i > 0 ? body[i - 1] : '\0', end < body.Length ? body[end] : '\0', outer.Count > 0));
+                i = end;
+                continue;
+            }
+            int take = 1; // characters copied as they are
+            switch (st)
+            {
+                case Ps.Bare:
+                    if (IsSingleQuote(c)) st = Ps.Single;
+                    else if (IsDoubleQuote(c)) st = Ps.Double;
+                    else if (c == '`' && n != '\0') take = 2;
+                    else if (c == '#' && (i == 0 || char.IsWhiteSpace(body[i - 1]) || body[i - 1] is ';' or '(' or '|' or '&' or ',' or '=')) st = Ps.LineComment;
+                    else if (c == '<' && n == '#') (st, take) = (Ps.BlockComment, 2);
+                    else if (c == '@' && (IsSingleQuote(n) || IsDoubleQuote(n)) && (i + 2 >= body.Length || IsLineBreak(body[i + 2])))
+                        (st, take) = (IsSingleQuote(n) ? Ps.HereSingle : Ps.HereDouble, 2);
+                    else if (c == '(') depth++;
+                    else if (c == ')' && depth > 0 && --depth == 0 && outer.Count > 0) (st, depth) = outer.Pop();
+                    break;
+                case Ps.Single:
+                    if (IsSingleQuote(c)) { if (IsSingleQuote(n)) take = 2; else st = Ps.Bare; }
+                    break;
+                case Ps.Double:
+                    if (c == '`' && n != '\0') take = 2;
+                    else if (IsDoubleQuote(c)) { if (IsDoubleQuote(n)) take = 2; else st = Ps.Bare; }
+                    else if (c == '$' && n == '(')
+                    {
+                        outer.Push((Ps.Double, depth));
+                        (st, depth, take) = (Ps.Bare, 1, 2);
+                    }
+                    break;
+                case Ps.HereSingle:
+                    if (IsLineBreak(c) && i + 2 < body.Length && IsSingleQuote(n) && body[i + 2] == '@') (st, take) = (Ps.Bare, 3);
+                    break;
+                case Ps.HereDouble:
+                    if (c == '`' && n != '\0') take = 2;
+                    else if (IsLineBreak(c) && i + 2 < body.Length && IsDoubleQuote(n) && body[i + 2] == '@') (st, take) = (Ps.Bare, 3);
+                    break;
+                case Ps.LineComment:
+                    if (IsLineBreak(c)) st = Ps.Bare;
+                    break;
+                default:
+                    if (c == '#' && n == '>') (st, take) = (Ps.Bare, 2);
+                    break;
+            }
+            take = Math.Min(take, body.Length - i);
+            sb.Append(body, i, take);
+            i += take;
+        }
+        return sb.ToString();
+    }
+
+    /// For a program or a .bat/.cmd: the value always inside "…" (the template's own quotes are followed), with no ",
+    /// line break or, for cmd, % (which cmd expands on its command line, even inside quotes) in it, and a trailing
+    /// backslash doubled so a program's argument parser can't read it as an escape of the closing quote.
+    private static string FillProgram(string body, IReadOnlyDictionary<string, (string text, bool literal)> map, bool cmd)
+    {
+        var sb = new System.Text.StringBuilder(body.Length + 16);
+        bool quoted = false;
+        for (int i = 0; i < body.Length;)
+        {
+            if (body[i] == '{' && PlaceholderAt(body, i, map) is { } key)
+            {
+                var (text, literal) = map[key];
+                i += key.Length;
+                if (literal) sb.Append(text);
+                else if (text.Length > 0)
+                {
+                    var v = new System.Text.StringBuilder(text.Length);
+                    foreach (char c in text)
+                        if (c != '"' && !(cmd && c == '%')) v.Append(IsLineBreak(c) ? ' ' : c);
+                    int slashes = 0;
+                    while (slashes < v.Length && v[v.Length - 1 - slashes] == '\\') slashes++;
+                    if (!cmd && (!quoted || (i < body.Length && body[i] == '"'))) v.Append('\\', slashes);
+                    sb.Append(quoted ? v.ToString() : "\"" + v + "\"");
+                }
+                continue;
+            }
+            if (body[i] == '"') quoted = !quoted;
+            sb.Append(body[i++]);
+        }
+        return sb.ToString();
     }
 
     /// A chain's steps: what would be typed in the search line, one after another.
