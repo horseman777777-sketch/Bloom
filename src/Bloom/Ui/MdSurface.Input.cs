@@ -31,15 +31,11 @@ internal sealed partial class MdSurface
 
     // ── places ──────────────────────────────────────────────────────────────────────────────────
 
-    /// Block k's texts made (copying a block not shaped yet needs only its text).
+    /// Block k's texts made from its block, not shaped or laid out (copying a block, moving over it, need only these).
     private MdBox Built(int k)
     {
         var b = boxes[k];
-        if (!b.Shaped)
-        {
-            b.Shape(Env(), Theme.P.Text, baseDir);
-            AskPictures(b);
-        }
+        b.Make(Env(), Theme.P.Text, baseDir);
         return b;
     }
 
@@ -303,9 +299,11 @@ internal sealed partial class MdSurface
     {
         if (Toggle is null || item.Block.Done is not { } done || !Toggle(item.Block.Line)) return false;
         item.Block.Done = !done;
-        item.Shaped = false; // its text dimmed or not
+        lastMd = null; // that reading no longer is its source's: the next Show reads again (its box isn't reused: Show)
+        item.Invalidate(); // its text dimmed or not
         Redraw(item);
         hover = null;
+        PaintHover();
         return true;
     }
 
@@ -324,7 +322,7 @@ internal sealed partial class MdSurface
         foreach (var b in boxes)
             if (b == inner || b.Contains(inner))
             {
-                if (b != inner) b.Shaped = inner.Shaped && b.Shaped;
+                if (b != inner && !inner.Shaped) b.Invalidate(); // a quote holds its blocks' texts
                 b.Width = -1;
                 Forget(b);
             }

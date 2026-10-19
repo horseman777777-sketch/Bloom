@@ -87,8 +87,13 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
         {
             Theme.Changed -= Repaint;
             Theme.Changed += Repaint;
+            MdPictures.Open(this);
         };
-        Unloaded += (_, _) => Theme.Changed -= Repaint;
+        Unloaded += (_, _) =>
+        {
+            Theme.Changed -= Repaint;
+            MdPictures.Closed(this);
+        };
         edge.Tick += (_, _) => Carry();
         copiedTimer.Tick += (_, _) => CopiedOver();
     }
@@ -109,6 +114,7 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
     public void Show(string md, double size, bool document, string? baseDir)
     {
         shown.Restart();
+        MdPictures.LookAgain(); // a picture that couldn't be read may be there now
         // the same text again (another text size): read once
         if (md != lastMd || document != lastDocument)
         {
@@ -120,12 +126,12 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
         var lines = lastLines;
         var blocks = lastBlocks;
         bool same = env is not null && size == this.size && document == this.document && baseDir == this.baseDir;
-        var pool = new Dictionary<string, Queue<MdBox>>();
+        var pool = new Dictionary<string, List<MdBox>>();
         if (same)
             foreach (var b in boxes)
             {
-                if (!pool.TryGetValue(b.Key, out var q)) pool[b.Key] = q = new Queue<MdBox>();
-                q.Enqueue(b);
+                if (!pool.TryGetValue(b.Key, out var q)) pool[b.Key] = q = [];
+                q.Add(b);
             }
         else env = null;
         this.size = size;
@@ -135,10 +141,14 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
         foreach (var b in blocks)
         {
             string key = string.Join('\n', lines, b.Line, Math.Max(0, Math.Min(b.End, lines.Length) - b.Line));
-            if (pool.TryGetValue(key, out var q) && q.Count > 0)
+            // the first box of the same source drawn as this reading has it (a box ticked since shows its own state)
+            int at = pool.TryGetValue(key, out var q) ? q.FindIndex(x => x.Shows(b)) : -1;
+            if (at >= 0)
             {
-                var kept = q.Dequeue();
+                var kept = q![at];
+                q.RemoveAt(at);
                 kept.Adopt(b);
+                if (kept.MissesPictures()) kept.Invalidate();
                 list.Add(kept);
             }
             else list.Add(new MdBox(b, key));
@@ -204,6 +214,7 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
                 Guess(b);
             }
             DropAll();
+            Relayout(); // the guessed heights in place: only the blocks on screen are laid out now (Near)
         }
         return env;
     }
@@ -393,7 +404,7 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
             MdPictures.Read(p, Dispatcher, () =>
             {
                 if (!boxes.Contains(b)) return;
-                b.Shaped = false; // missing: its alt text instead; there: its room
+                b.Invalidate(); // missing: its alt text instead; there: its room
                 Forget(b);
                 InvalidateArrange();
             });
@@ -498,7 +509,7 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
                 MdPictures.Decode(p, p.Width * (env?.Ppd ?? 1), Dispatcher, () =>
                 {
                     if (!boxes.Contains(b)) return;
-                    if (p.Missing) b.Shaped = false;
+                    if (p.Missing) b.Invalidate();
                     Forget(b);
                     InvalidateArrange();
                 });

@@ -29,7 +29,7 @@ internal static class MdBench
 
     private sealed class Round
     {
-        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs, SliceMaxMs, SliceGcMs, SizeDrawnMs, OutsideDrawnMs, JumpMax, ScrollGapMs, ResizeGapMs, CloseGapMs, GcPauseMs, ScrollBusyMs, ResizeBusyMs, MaxBusyMs;
+        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs, SliceMaxMs, SliceGcMs, SizeDrawnMs, OutsideDrawnMs, JumpMax, ScrollGapMs, ResizeGapMs, CloseGapMs, GcPauseMs, ScrollBusyMs, ResizeBusyMs, MaxBusyMs, NarrowSizeSettleMs, NarrowSizeBusyMs, NarrowSizeDrawnMs;
         public int ScrollSteps, Stalls50, Stalls100, Gen2, Busy50, Busy100;
         public bool SweptAll;
     }
@@ -89,6 +89,9 @@ internal static class MdBench
                 Line(text, "text size: settle − 120 ms debounce", results, x => x.SizeSettleMs);
                 Line(text, "text size: longest UI gap ms", results, x => x.SizeGapMs);
                 Line(text, "text size: redraw (Show → drawn) ms", results, x => x.SizeDrawnMs);
+                Line(text, "narrow (480 px) text size: settle − 120 ms debounce", results, x => x.NarrowSizeSettleMs);
+                Line(text, "narrow (480 px) text size: busy probe longest ms", results, x => x.NarrowSizeBusyMs);
+                Line(text, "narrow (480 px) text size: redraw (Show → drawn) ms", results, x => x.NarrowSizeDrawnMs);
                 Line(text, "checkbox tick settle ms", results, x => x.TickMs);
                 Line(text, "checkbox tick longest UI gap ms", results, x => x.TickGapMs);
                 Line(text, "outside edit settle ms", results, x => x.OutsideMs);
@@ -307,6 +310,22 @@ internal static class MdBench
         r.SizeGapMs = probe.Longest(mark);
         r.SizeDrawnMs = view.Surface.ShowToDrawnMs;
         pane.SetTextSize(Settings.MdTextDefault);
+        await Task.Delay(200);
+        await Idle();
+
+        // text size in a narrow window (the column the same at both sizes): one step up
+        d.Width = 480;
+        await Idle();
+        mark = busy.Mark();
+        t0 = watch.Elapsed.TotalMilliseconds;
+        pane.SetTextSize(MdPane.TextSize + 1);
+        await Task.Delay(130);
+        await Idle();
+        r.NarrowSizeSettleMs = watch.Elapsed.TotalMilliseconds - t0 - 120;
+        r.NarrowSizeBusyMs = busy.Longest(mark);
+        r.NarrowSizeDrawnMs = view.Surface.ShowToDrawnMs;
+        pane.SetTextSize(Settings.MdTextDefault);
+        d.Width = 900;
         await Task.Delay(200);
         await Idle();
 

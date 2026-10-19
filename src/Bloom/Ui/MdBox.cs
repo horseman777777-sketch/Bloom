@@ -139,6 +139,7 @@ internal sealed class MdBox
     public MdBlock Block;
     public readonly string Key;
     public bool Shaped;
+    private MdEnv? made; // the look its texts were made at (Make); null: to be made again
     public double Width = -1, Height, MarginTop, MarginBottom;
     public readonly List<MdPart> Parts = [];
     private readonly List<MdDeco> back = [], front = [];
@@ -183,9 +184,28 @@ internal sealed class MdBox
 
     // ── shaping ─────────────────────────────────────────────────────────────────────────────────
 
-    /// Its texts made and shaped in `ink` (a document's quote: dimmed) — at the view's size and DPI, once.
-    public void Shape(MdEnv env, Brush ink, string? baseDir)
+    /// Made and shaped again when next needed (its box ticked, a picture found or lost), its quoted blocks too.
+    public void Invalidate()
     {
+        Shaped = false;
+        made = null;
+        foreach (var c in children) c.Invalidate();
+    }
+
+    /// Whether it is drawn as `b` reads (a box ticked since it was made shows its own state): it may stand for it.
+    public bool Shows(MdBlock b)
+    {
+        if (Block.Done != b.Done || children.Count != b.Children.Count) return false;
+        for (int k = 0; k < children.Count; k++)
+            if (!children[k].Shows(b.Children[k])) return false;
+        return true;
+    }
+
+    /// Its texts made from its block in `ink` (a document's quote: dimmed), in reading order — a quote's are its
+    /// blocks' — not shaped: copying and moving the selection need only these. Once per look (MdEnv).
+    public void Make(MdEnv env, Brush ink, string? baseDir)
+    {
+        if (made == env) return;
         var m = env.M;
         var b = Block;
         brush = ink;
@@ -202,17 +222,13 @@ internal sealed class MdBox
             case MdKind.Item:
                 Parts.Add(new MdPart(MdText.Of(b.Spans, env, m.Size, FontWeights.Normal, b.Done == true ? Theme.P.TextDim : ink, baseDir), m.Line));
                 marker = b.Done is null ? MdText.Plain(b.Marker, env.Props(Theme.Sans, FontWeights.Normal, FontStyles.Normal, m.Size, Theme.P.TextFaint)) : null;
-                marker?.Shape(env);
                 break;
             case MdKind.Code:
                 var small = env.Props(Theme.Sans, FontWeights.Medium, FontStyles.Normal, MdMetrics.LabelSize, Theme.P.TextFaint);
                 label = b.Lang.Length > 0 ? MdText.Plain(b.Lang, small) : null;
-                label?.Shape(env);
                 var button = env.Props(Theme.Sans, FontWeights.Medium, FontStyles.Normal, MdMetrics.LabelSize, Theme.P.TextDim);
                 copy = MdText.Plain(Tr("복사", "Copy"), button);
-                copy.Shape(env);
                 copied = MdText.Plain(Tr("복사 완료", "Copied"), button);
-                copied.Shape(env);
                 Parts.Add(new MdPart(MdText.OfCode(b.Code, env.Props(Theme.Mono, FontWeights.Normal, FontStyles.Normal, m.CodeSize, Theme.P.Text)), m.CodeLine));
                 break;
             case MdKind.Table:
@@ -224,16 +240,40 @@ internal sealed class MdBox
                     }
                 break;
             case MdKind.Quote:
-                foreach (var c in children) c.Shape(env, m.Document ? Theme.P.TextDim : ink, baseDir); // a document's quote reads as aside
+                foreach (var c in children)
+                {
+                    c.Make(env, m.Document ? Theme.P.TextDim : ink, baseDir); // a document's quote reads as aside
+                    Parts.AddRange(c.Parts);
+                }
                 break;
         }
-        foreach (var p in Parts) p.Text.Shape(env);
+        made = env;
+        Shaped = false;
+    }
+
+    /// Its texts made (Make) and shaped — at the view's size and DPI, once.
+    public void Shape(MdEnv env, Brush ink, string? baseDir)
+    {
+        Make(env, ink, baseDir);
+        if (Block.Kind == MdKind.Quote)
+            foreach (var c in children) c.Shape(env, c.brush, baseDir);
+        else
+        {
+            foreach (var p in Parts) p.Text.Shape(env);
+            marker?.Shape(env);
+            label?.Shape(env);
+            copy?.Shape(env);
+            copied?.Shape(env);
+        }
         Shaped = true;
         Width = -1;
     }
 
     /// Every picture in it (to read their headers).
-    public IEnumerable<MdPicture> Pictures() => Parts.SelectMany(p => p.Text.Pictures.Select(x => x.Picture)).Concat(children.SelectMany(c => c.Pictures()));
+    public IEnumerable<MdPicture> Pictures() => Parts.SelectMany(p => p.Text.Pictures.Select(x => x.Picture));
+
+    /// Whether a picture of it shows as its alt text because its file couldn't be read (Show looks again).
+    public bool MissesPictures() => Parts.Any(p => p.Text.Unread);
 
     // ── layout ──────────────────────────────────────────────────────────────────────────────────
 
@@ -400,14 +440,12 @@ internal sealed class MdBox
     {
         double inner = MdMetrics.QuoteBar + MdMetrics.QuoteLeft;
         double y = MdMetrics.QuoteTop, under = 0;
-        Parts.Clear();
         for (int k = 0; k < children.Count; k++)
         {
             var c = children[k];
             c.Arrange(env, Math.Max(1, width - inner));
             y += k == 0 ? c.MarginTop : Math.Max(under, c.MarginTop);
-            c.Shift(inner, y);
-            Parts.AddRange(c.Parts);
+            c.Shift(inner, y); // its parts are this quote's (Make)
             back.AddRange(c.back);
             front.AddRange(c.front);
             Spots.AddRange(c.Spots);

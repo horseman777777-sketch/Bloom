@@ -257,6 +257,121 @@ internal static class MdViewTests
         }
     }
 
+    public static void ANarrowTextSizeStepLaysOutOnlyTheScreen()
+    {
+        var view = new MdView();
+        var w = Hosted(view, 480, 320);
+        try
+        {
+            string md = Paragraphs(600);
+            view.Show(md, 14, true, null);
+            view.UpdateLayout();
+            view.Show(md, 15, true, null); // the column as wide at both sizes: the window is narrower than the reading width
+            view.UpdateLayout();
+            int shaped = view.Surface.Boxes.Count(b => b.Shaped);
+            Check.True(shaped > 0 && shaped < 40, $"the blocks near the screen shaped now, the rest later: {shaped} of {view.Surface.Boxes.Count}");
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    public static void ATickedBoxIsDrawnAsItsSourceReads()
+    {
+        var view = new MdView();
+        var w = Hosted(view);
+        var lines = new System.Collections.Generic.List<int>();
+        view.Toggle = l =>
+        {
+            lines.Add(l);
+            return true;
+        };
+        try
+        {
+            static bool Dim(MdBox b) => b.Parts[0].Text.LookAt(0).ForegroundBrush == Theme.P.TextDim;
+            // ticked in 보기, unticked by hand in 편집, back to 보기: the source as it was before the tick
+            string s0 = "- [ ] a\n\nb";
+            view.Show(s0, 14, true, null);
+            view.UpdateLayout();
+            Check.True(view.Surface.TickForQa(0), "ticked");
+            view.Show(s0, 14, true, null);
+            view.UpdateLayout();
+            var box = view.Surface.Boxes[0];
+            Check.True(box.Block.Done == false && !Dim(box), "drawn unticked again, as the source reads");
+            Check.True(view.Surface.TickForQa(0) && view.Surface.Boxes[0].Block.Done == true && lines is [0, 0], "the next click ticks it");
+            // two items alike: the first ticked, then a redraw from the source (another program's edit)
+            view.Show("- [ ] a\n- [ ] a", 14, true, null);
+            view.UpdateLayout();
+            Check.True(view.Surface.TickForQa(0), "the first ticked");
+            view.Show("- [x] a\n- [ ] a", 14, true, null);
+            view.UpdateLayout();
+            var (first, second) = (view.Surface.Boxes[0], view.Surface.Boxes[1]);
+            Check.True(first.Block.Done == true && Dim(first), "the first ticked and dimmed");
+            Check.True(second.Block.Done == false && !Dim(second), "the second unticked, not dimmed (not the ticked box reused)");
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    public static void CopyBeforeLayoutKeepsQuotesAndShapesNothing()
+    {
+        var view = new MdView();
+        var w = Hosted(view);
+        try
+        {
+            view.Show(Paragraphs(80) + "> 인용 끝\n", 14, true, null);
+            view.UpdateLayout();
+            int shaped = view.Surface.Boxes.Count(b => b.Shaped);
+            Check.True(!view.Surface.Boxes[^1].Shaped, "the quote far below the screen not laid out yet");
+            view.SelectEverything();
+            Check.True(view.SelectedText().EndsWith("\r\n인용 끝", StringComparison.Ordinal), "모두 선택 and copy: the quote too");
+            var value = (IValueProvider)UIElementAutomationPeer.CreatePeerForElement(view.Surface).GetPattern(PatternInterface.Value);
+            Check.True(value.Value.EndsWith("\r\n인용 끝", StringComparison.Ordinal), "the screen reader's text: the quote too");
+            Check.Eq(view.Surface.Boxes.Count(b => b.Shaped), shaped, "copying shaped nothing more");
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    public static void APictureThatCouldntBeReadIsReadAgain()
+    {
+        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "bloom-test-pic-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var view = new MdView();
+        var w = Hosted(view);
+        try
+        {
+            string md = "앞 ![그림](later.png) 뒤";
+            var text = () => view.Surface.Boxes[0].Parts[0].Text;
+            view.Show(md, 14, true, dir);
+            Pump(() =>
+            {
+                view.UpdateLayout();
+                return text().Unread;
+            }, "the missing picture shown as its alt text");
+            var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(4, 3, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4 * 3 * 4], 4 * 4);
+            var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+            using (var file = System.IO.File.Create(System.IO.Path.Combine(dir, "later.png"))) png.Save(file);
+            view.Show(md, 14, true, dir); // the same text again (a redraw): the picture looked for again
+            Pump(() =>
+            {
+                view.UpdateLayout();
+                return text().Pictures is [{ Picture.Ready: true }];
+            }, "the picture added since shown");
+        }
+        finally
+        {
+            w.Close();
+            System.IO.Directory.Delete(dir, true);
+        }
+    }
+
     /// `n` paragraphs of mixed length.
     private static string Paragraphs(int n)
     {

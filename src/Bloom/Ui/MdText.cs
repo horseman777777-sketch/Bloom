@@ -173,6 +173,9 @@ internal sealed class MdText
     private int[]? objectsAt; // where the text has an object character, in order
     private MdObject?[]? objects;
 
+    /// A picture in it shows as its alt text because its file couldn't be read.
+    public bool Unread { get; init; }
+
     public float[] X = [];
     public int[] Opportunities = [];
     private float[] cuts = []; // per opportunity: the ink's right end before it, the ink's left end after it (InkAtCuts)
@@ -215,6 +218,7 @@ internal sealed class MdText
         var code = new List<(int, int)>();
         var copy = new List<(int, int, string)>();
         var pictures = new List<(int, MdPicture)>();
+        bool unread = false;
         void Look(MdRunProps p)
         {
             if (looks.Count > 0 && looks[^1] == p) return;
@@ -249,18 +253,23 @@ internal sealed class MdText
                     sb.Append(shown);
                     links.Add((at, sb.Length, new MdLink(src)));
                 }
-                else if (DocLink.Picture(src, baseDir) is { } path && MdPictures.Known(path) is not { Missing: true })
-                {
-                    Look(env.Props(Theme.Sans, w, st, size, brush));
-                    sb.Append(LineBreaks.ObjectChar);
-                    var picture = new MdPicture(path, s.Text);
-                    MdPictures.Fill(picture);
-                    pictures.Add((at, picture));
-                }
                 else
                 {
-                    Look(env.Props(Theme.Sans, w, st, size, Theme.P.TextFaint, strike));
-                    sb.Append(shown.Replace('\n', ' '));
+                    string? path = DocLink.Picture(src, baseDir);
+                    if (path is not null && MdPictures.Known(path) is not { Missing: true })
+                    {
+                        Look(env.Props(Theme.Sans, w, st, size, brush));
+                        sb.Append(LineBreaks.ObjectChar);
+                        var picture = new MdPicture(path, s.Text);
+                        MdPictures.Fill(picture);
+                        pictures.Add((at, picture));
+                    }
+                    else
+                    {
+                        unread |= path is not null; // a file that couldn't be read (MdPictures looks again on the next Show)
+                        Look(env.Props(Theme.Sans, w, st, size, Theme.P.TextFaint, strike));
+                        sb.Append(shown.Replace('\n', ' '));
+                    }
                 }
                 continue;
             }
@@ -287,7 +296,7 @@ internal sealed class MdText
             starts.Add(0);
             looks.Add(own);
         }
-        return new MdText(sb.ToString(), [.. starts], [.. looks], [.. links], [.. code], [.. copy], [.. pictures], codeTint: true, look: own);
+        return new MdText(sb.ToString(), [.. starts], [.. looks], [.. links], [.. code], [.. copy], [.. pictures], codeTint: true, look: own) { Unread = unread };
     }
 
     /// A code block's text: one look, lines at '\n', all of it breaking as code.
