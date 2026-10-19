@@ -32,7 +32,7 @@ internal static partial class Captures
             if (d.PaneForQa.KeyTarget is MdView view)
             {
                 System.Windows.Input.Keyboard.Focus(view);
-                view.Surface.Select(new MdSpotAt(2, 0, 6), new MdSpotAt(5, 0, 8)); // from 둘째 문단 into 셋째 문단
+                view.Surface.Select(new MdSpotAt(2, 0, 4), new MdSpotAt(5, 0, 5)); // from 둘째 문단 into 셋째 문단 (the old capture's span)
                 await Task.Delay(300);
                 log.AppendLine($"{theme} keyboard in the view {view.IsKeyboardFocused}");
                 log.AppendLine($"{theme} copy: {view.SelectedText().Replace("\r\n", " ⏎ ", System.StringComparison.Ordinal)}");
