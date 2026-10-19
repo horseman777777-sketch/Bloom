@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Bloom.Native;
+using Bloom.WinKey;
 
 namespace Bloom.App;
 
@@ -9,20 +10,18 @@ namespace Bloom.App;
 /// Win + any other key (Win+E, Win+Shift+S, …) behaves as before; Ctrl+Esc still opens Start.
 /// The hook lives on its own thread with its own message loop: if it shared the UI thread, a busy
 /// frame would stall everyone's typing and Windows would silently remove the hook.
-/// Blind while an elevated window has focus (UIPI), like the helper it replaces.
+/// Blind while an elevated window has focus (UIPI): there the elevated helper takes the press when switched on
+/// (ElevatedWinKey). Whichever hook takes a tap replays its release tagged, and the other one resyncs on it (WinTap).
 internal sealed class WinKeyHook : IDisposable
 {
-    private const uint VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12, VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_MASK = 0xE8;
     private const uint WM_APP_FIRE = Win32.WM_APP + 1;
-    private static readonly UIntPtr OwnTag = (UIntPtr)0x41534C57u; // "ASLW": marks our own injected keys
 
     private readonly Action fired;
+    private readonly WinTap tap = new();
     private Thread? thread;
     private uint threadId;
     private IntPtr hook;
     private Win32.HookProc? proc; // kept referenced so the GC never collects the callback
-    private uint winDown;
-    private bool combo;
 
     public bool Active => hook != IntPtr.Zero;
 
@@ -54,35 +53,14 @@ internal sealed class WinKeyHook : IDisposable
         if (nCode >= 0)
         {
             var k = Marshal.PtrToStructure<Win32.KBDLLHOOKSTRUCT>(lParam);
-            if (k.dwExtraInfo != OwnTag)
+            int m = (int)wParam.ToInt64();
+            bool down = m is Win32.WM_KEYDOWN or Win32.WM_SYSKEYDOWN;
+            bool up = m is Win32.WM_KEYUP or Win32.WM_SYSKEYUP;
+            if (tap.Key(k.vkCode, down, up, k.dwExtraInfo == WinKeyProtocol.OwnTag, ModifiersHeld))
             {
-                int m = (int)wParam.ToInt64();
-                bool down = m is Win32.WM_KEYDOWN or Win32.WM_SYSKEYDOWN;
-                bool up = m is Win32.WM_KEYUP or Win32.WM_SYSKEYUP;
-                if (k.vkCode is VK_LWIN or VK_RWIN)
-                {
-                    if (down)
-                    {
-                        if (winDown == 0)
-                        {
-                            winDown = k.vkCode;
-                            combo = Held(VK_SHIFT) || Held(VK_CONTROL) || Held(VK_MENU);
-                        }
-                        else if (k.vkCode != winDown) combo = true;
-                    }
-                    else if (up && k.vkCode == winDown)
-                    {
-                        bool fire = !combo;
-                        winDown = 0;
-                        if (fire)
-                        {
-                            // swallow this release; Fire() replays it behind a mask key so Start stays closed
-                            Win32.PostThreadMessage(threadId, WM_APP_FIRE, (IntPtr)k.vkCode, IntPtr.Zero);
-                            return new IntPtr(1);
-                        }
-                    }
-                }
-                else if (down && winDown != 0) combo = true;
+                // swallow this release; Fire() replays it behind a mask key so Start stays closed
+                Win32.PostThreadMessage(threadId, WM_APP_FIRE, (IntPtr)k.vkCode, IntPtr.Zero);
+                return new IntPtr(1);
             }
         }
         return Win32.CallNextHookEx(hook, nCode, wParam, lParam);
@@ -90,12 +68,14 @@ internal sealed class WinKeyHook : IDisposable
 
     private static bool Held(uint vk) => (Win32.GetAsyncKeyState((int)vk) & 0x8000) != 0;
 
-    private static void Key(uint vk, bool up) => Win32.keybd_event((byte)vk, 0, up ? Win32.KEYEVENTF_KEYUP : 0, OwnTag);
+    private static bool ModifiersHeld() => Held(WinTap.VK_SHIFT) || Held(WinTap.VK_CONTROL) || Held(WinTap.VK_MENU);
+
+    private static void Key(uint vk, bool up) => Win32.keybd_event((byte)vk, 0, up ? Win32.KEYEVENTF_KEYUP : 0, WinKeyProtocol.OwnTag);
 
     private void Fire(byte winVk)
     {
-        Key(VK_MASK, false);
-        Key(VK_MASK, true);
+        Key(WinTap.VK_MASK, false);
+        Key(WinTap.VK_MASK, true);
         Key(winVk, true);
         // our process injected the last input, so the UI thread may take the foreground
         fired();

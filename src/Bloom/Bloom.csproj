@@ -36,6 +36,8 @@
     <EmbeddedResource Include="..\..\CHANGELOG.md" LogicalName="Bloom.CHANGELOG.md" />
     <!-- tests\Bloom.Tests checks the internal parsers and rankers directly -->
     <InternalsVisibleTo Include="Bloom.Tests" />
+    <!-- what Bloom and its elevated Win-key helper (src\WinKeyHelper, issue #3) share: names, tag, task, the tap rule -->
+    <Compile Include="..\WinKeyHelper\Shared\*.cs" Link="WinKey\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
