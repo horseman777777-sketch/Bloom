@@ -8,7 +8,8 @@ namespace Bloom.Core;
 /// FlowDocument needed (Hangul.KeepAll): a text is shaped once on one line (its characters' x), and its lines are found
 /// here by arithmetic. A line may end after spaces; Korean words keep whole (only spaces part them, CSS keep-all);
 /// Chinese and Japanese break between characters but not before closing marks or after opening ones (basic kinsoku); a
-/// hyphen or dash between letters may end one; code and addresses break where MdParser.CodeBreakAfter says; a word
+/// hyphen or dash between letters may end one; code and addresses break where MdParser.CodeBreakAfter says and before
+/// an opening bracket that follows a letter or digit; a word
 /// longer than the line breaks between its grapheme clusters (an emoji sequence or a letter with its marks stays whole).
 internal static class LineBreaks
 {
@@ -58,6 +59,13 @@ internal static class LineBreaks
                 continue;
             }
             if (inCode && MdParser.CodeBreakAfter(text.AsSpan(code![codeAt].Start, code[codeAt].End - code[codeAt].Start), k - 1 - code[codeAt].Start))
+            {
+                list.Add(k);
+                continue;
+            }
+            // and before an opening bracket after a letter or digit (a call or an index: "Shader.Find" / "(…)"), where
+            // FlowDocument broke the same code
+            if (inCode && next is '(' or '[' or '{' && char.IsLetterOrDigit(prev))
             {
                 list.Add(k);
                 continue;
