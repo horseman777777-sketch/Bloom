@@ -81,7 +81,7 @@ internal static class MarkdownTests
             double column = surface.Boxes[0].Width;
             Check.True(wide.Width is > 0 && wide.Width <= column + 0.01, $"a wide picture fits the width (got {wide.Width:0.#} in {column:0.#})");
             double ppd = VisualTreeHelper.GetDpi(view).PixelsPerDip;
-            Check.True(wide.Bitmap!.Width <= System.Math.Ceiling(column * ppd) && wide.Bitmap.Source.PixelWidth <= MdPictures.PictureWidth, $"decoded for its drawn width, not its 3000 pixels (got {wide.Bitmap.Width})");
+            Check.True(wide.Bitmap!.Width <= System.Math.Ceiling(column * ppd / MdPictures.WidthStep) * MdPictures.WidthStep && wide.Bitmap.Source.PixelWidth <= MdPictures.PictureWidth, $"decoded for its drawn width, not its 3000 pixels (got {wide.Bitmap.Width})");
             var inList = surface.Boxes[3].Parts[0];
             Check.True(inList.Text.Pictures[0].Picture.Width <= column - inList.X + 0.01 && inList.X >= 16, "and the room beside a list marker");
             Check.True(surface.Boxes[0].Height >= wide.Height, "the line as tall as the picture");

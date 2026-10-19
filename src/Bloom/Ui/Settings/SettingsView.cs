@@ -235,6 +235,21 @@ internal sealed partial class SettingsView : ScrollViewer
         }, filter);
     }
 
+    /// A value along a track (LevelSlider): dragging sets it as it moves, letting go saves it; ←→ step it by `step`.
+    private void Level(string title, string? sub, char glyph, int value, int min, int max, int step, Func<int, string> label, Action<int> set, string filter)
+    {
+        if (Record(title, sub, filter)) return;
+        var slider = new LevelSlider(value, min, max, label);
+        slider.Moved += set;
+        slider.Picked += _ => Settings.Save();
+        Add(title, sub, slider, glyph, null, d =>
+        {
+            set(slider.Step(d * step));
+            Settings.Save();
+            return true;
+        }, filter);
+    }
+
     /// A global shortcut, pressed in (KeyRecorder): the row's Enter or a click listens for it; the line under it says
     /// whether Windows gave it to us.
     private void Shortcut(string name, string title, string what, char glyph, string value, Action<string> set, string filter)

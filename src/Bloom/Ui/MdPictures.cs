@@ -22,7 +22,7 @@ internal static class MdPictures
     private const long KeepBytes = 64L << 20;
 
     /// Decode widths go up in steps of this many pixels: a window resized doesn't decode a picture for every width.
-    private const int WidthStep = 128;
+    public const int WidthStep = 128;
 
     private sealed record Header(DateTime Written, int Width, int Height, double DpiX, double DpiY, bool Missing);
 

@@ -2,6 +2,24 @@
 
 Each release on GitHub shows its section from this file (the workflow looks for `## <version>`).
 
+## 0.15.1
+
+- Markdown documents and notes no longer stall, even with many tables: Bloom now lays out and draws the text itself, only what is on the screen. On the test PC a 22 KB document with 24 tables opens in 0.05 s instead of 0.7 s, and scrolling, resizing the window and changing the text size no longer pause (the longest pause fell from 4.7 s to 0.05 s). Shift+arrow selection now carries on across paragraphs, and a shortened link copies as its whole address.
+- Glass transparency is a slider (Settings › Performance › Display, 15–75 %); the windows change as it moves.
+- The "update downloaded" card has "Restart to update", which puts the update in right away (#2).
+- Win key over admin apps (Settings › General, shown on administrator accounts): with an app run as administrator in front, a lone Win press now opens Bloom instead of the Start menu. Turning it on asks for admin approval once and installs a small helper, "Bloom Win-key helper", in Program Files that watches only the Win key and only while Bloom runs. Turning it off or uninstalling Bloom removes it (with admin approval); Windows Settings › Apps can remove it too. Reported by @nuv47 (#3).
+- Security: in custom commands, what `{input}` and `{clipboard}` put into a script is always taken as text and never run as a command, whatever quotes the script puts around it; the winget "install in a terminal" line quotes the package's Id and source too. Thanks to @horseman777777-sketch (#5).
+- Fixed: Bloom Lens and the color picker covered only part of a monitor whose scale differs from the main one (a 100 % monitor beside a 150 % one). Thanks to @horseman777777-sketch (#4).
+
+### 한국어
+
+- 표가 많은 마크다운 문서와 메모도 멈추지 않습니다. 이제 Bloom이 글자 배치를 직접 계산해 화면에 보이는 부분만 그립니다. 시험 PC에서 표 24개가 든 22KB 문서가 0.7초 대신 0.05초 만에 열리고, 스크롤·창 크기·글자 크기를 바꿀 때도 멈추지 않습니다(가장 긴 멈춤 4.7초 → 0.05초). Shift+화살표 선택이 문단을 넘어 이어지고, 줄여 표시한 링크는 전체 주소로 복사됩니다.
+- 유리 투명도를 슬라이더로 정합니다(설정 › 성능 › 화면, 15~75%). 움직이는 동안 창에 바로 반영됩니다.
+- '다운로드 완료' 업데이트 카드에 '다시 시작해서 업데이트' 버튼이 생겼습니다. 누르면 바로 업데이트를 적용합니다(#2).
+- 관리자 앱 위에서도 Win 키 사용(설정 › 일반, 관리자 계정에서만 표시): 관리자 권한으로 실행한 앱이 앞에 있어도 Win 키 한 번으로 시작 메뉴 대신 Bloom이 열립니다. 켤 때 관리자 승인을 한 번 받고, Bloom이 실행 중일 때 Win 키만 살피는 작은 도우미 'Bloom Win-key helper'를 Program Files에 설치합니다. 끄거나 Bloom을 삭제하면 지우며(관리자 승인 필요), Windows 설정 › 앱에서도 지울 수 있습니다. @nuv47 님 제보(#3).
+- 보안: 사용자 명령에서 `{input}`과 `{clipboard}`로 스크립트에 들어가는 값은 스크립트가 어떤 따옴표를 두르든 항상 글자로만 다루고 명령으로 실행하지 않습니다. winget '터미널에서 설치' 줄의 패키지 Id와 소스도 따옴표로 감쌉니다. @horseman777777-sketch 님 감사합니다(#5).
+- 수정: 배율이 주 모니터와 다른 모니터에서 Bloom Lens와 색 고르기가 화면 일부만 덮던 문제(150% 옆의 100% 모니터 등)를 고쳤습니다. @horseman777777-sketch 님 감사합니다(#4).
+
 ## 0.15.0
 
 - Markdown documents (.md) open in Bloom's own document window: it shows in the taskbar like other apps and snaps like other windows. Open one with "View in Bloom" on a .md file you find or with Explorer's "Open with"; in the setup's install, Settings › Features › "Make it the default app" lets a double-click in Explorer open them in Bloom. Settings › Features › Markdown documents turns it off.
@@ -12,10 +30,6 @@ Each release on GitHub shows its section from this file (the workflow looks for 
 - Links in notes and documents open only web pages (http, https) and e-mail (mailto); a link to a file on this PC shows it in its folder. Pictures in network folders are not loaded, so Windows doesn't hand your sign-in to them, unless the document is in that network folder itself.
 - AI accounts: an added account can be signed out with its × or "Sign out" in its menu, after a confirmation. Bloom runs the CLI's own sign-out (for ChatGPT, after stopping Bloom's Codex for it), then moves the account's folder to the Recycle Bin; AI chat goes back to the default account.
 - Glass transparency: Settings › Performance › Display sets how much of the screen behind shows through the glass (15–75 %, 30 % by default).
-- The "update downloaded" card has "Restart to update", which puts the update in right away (#2).
-- Win key over admin apps (Settings › General, shown on administrator accounts): with an app run as administrator in front, a lone Win press now opens Bloom instead of the Start menu. Turning it on asks for admin approval once and installs a small helper, "Bloom Win-key helper", in Program Files that watches only the Win key and only while Bloom runs. Turning it off or uninstalling Bloom removes it (with admin approval); Windows Settings › Apps can remove it too. Reported by @nuv47 (#3).
-- Security: in custom commands, what `{input}` and `{clipboard}` put into a script is always taken as text and never run as a command, whatever quotes the script puts around it; the winget "install in a terminal" line quotes the package's Id and source too. Thanks to @horseman777777-sketch (#5).
-- Fixed: Bloom Lens and the color picker covered only part of a monitor whose scale differs from the main one (a 100 % monitor beside a 150 % one). Thanks to @horseman777777-sketch (#4).
 - Fixed: a black console window could pop up for a moment when Bloom stalled, for example while opening a long .md file. Bloom no longer writes diagnostic files for stalls; its log still notes each one in a line, and the old files in `%LOCALAPPDATA%\Bloom\stalls` are deleted.
 
 ### 한국어
@@ -28,10 +42,6 @@ Each release on GitHub shows its section from this file (the workflow looks for 
 - 메모와 문서의 링크는 웹 페이지(http, https)와 메일(mailto)만 열고, PC 안 파일 링크는 폴더에서 해당 파일을 표시합니다. 네트워크 폴더의 그림은 Windows 로그인 정보가 그쪽으로 전달되지 않도록 불러오지 않습니다. 문서가 그 네트워크 폴더 안에 있을 때만 불러옵니다.
 - AI 계정: 추가한 계정은 ×나 메뉴의 '로그아웃'으로, 확인을 거쳐 로그아웃할 수 있습니다. CLI의 공식 로그아웃을 실행한 뒤(ChatGPT는 그 계정의 Bloom Codex를 먼저 멈춤) 계정 폴더를 휴지통으로 옮기고, AI 채팅은 기본 계정으로 돌아갑니다.
 - 유리 투명도: 설정 › 성능 › 화면에서 유리 너머로 뒤 화면이 비치는 정도를 고릅니다(15~75%, 기본 30%).
-- '다운로드 완료' 업데이트 카드에 '다시 시작해서 업데이트' 버튼이 생겼습니다. 누르면 바로 업데이트를 적용합니다(#2).
-- 관리자 앱 위에서도 Win 키 사용(설정 › 일반, 관리자 계정에서만 표시): 관리자 권한으로 실행한 앱이 앞에 있어도 Win 키 한 번으로 시작 메뉴 대신 Bloom이 열립니다. 켤 때 관리자 승인을 한 번 받고, Bloom이 실행 중일 때 Win 키만 살피는 작은 도우미 'Bloom Win-key helper'를 Program Files에 설치합니다. 끄거나 Bloom을 삭제하면 지우며(관리자 승인 필요), Windows 설정 › 앱에서도 지울 수 있습니다. @nuv47 님 제보(#3).
-- 보안: 사용자 명령에서 `{input}`과 `{clipboard}`로 스크립트에 들어가는 값은 스크립트가 어떤 따옴표를 두르든 항상 글자로만 다루고 명령으로 실행하지 않습니다. winget '터미널에서 설치' 줄의 패키지 Id와 소스도 따옴표로 감쌉니다. @horseman777777-sketch 님 감사합니다(#5).
-- 수정: 배율이 주 모니터와 다른 모니터에서 Bloom Lens와 색 고르기가 화면 일부만 덮던 문제(150% 옆의 100% 모니터 등)를 고쳤습니다. @horseman777777-sketch 님 감사합니다(#4).
 - 수정: Bloom이 잠깐 멈출 때(예: 긴 .md 파일을 열 때) 검은 콘솔 창이 잠깐 뜨던 문제를 고쳤습니다. 멈춤 진단 파일은 더 이상 만들지 않고 로그에 한 줄로만 남기며, `%LOCALAPPDATA%\Bloom\stalls`의 예전 파일은 지웁니다.
 
 ## 0.14.1

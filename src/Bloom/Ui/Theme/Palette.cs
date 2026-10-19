@@ -22,7 +22,13 @@ internal sealed class Palette
     {
         Base(dark);
         if (Accents.Find(accent) is { Key: not "rose" } a) Recolor(dark, a);
-        // the glass windows' fill over the acrylic: the solid background, see-through by the setting
+        Glass(glassTransparency);
+    }
+
+    /// The glass windows' fill over the acrylic: the solid background, see-through by the setting. Every glass window
+    /// shares this brush, so the slider changes them all as it moves.
+    public void Glass(int glassTransparency)
+    {
         var c = Solid.Color;
         Tint.Color = Color.FromArgb((byte)Math.Round(2.55 * (100 - Math.Clamp(glassTransparency, 0, 100))), c.R, c.G, c.B);
     }

@@ -212,7 +212,7 @@ The empty search line shows the home: favorites, AI usage, this week, timers, re
 - **Features on and off**: disabling a feature (AI chat · Bloom Lens · calculator · timers · color picker · emoji · window switching …) removes it from search results, commands, home and favorites, and releases its shortcut. Saved data is retained.
 - **Look · performance**
   - Dark, light or system theme, and accent color presets
-  - Animations on · reduced · off, how many per second (30 · 60 · max), glass off or how see-through it is (15–75 %)
+  - Animations on · reduced · off, how many per second (30 · 60 · max), glass off or how see-through it is (a slider, 15–75 %)
   - Bloom draws with the CPU by default. GPU drawing is experimental: on some PCs the screen may stutter or freeze for a few seconds. Pick it at first start or in Settings › Performance
   - Features that use memory say in the settings how much they add.
 - **Language · first start · moving**

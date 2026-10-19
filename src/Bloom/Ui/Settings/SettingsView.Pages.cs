@@ -567,12 +567,11 @@ internal sealed partial class SettingsView
                 s.Transparency = v;
                 Theme.Apply(s.Theme);
             }, filter);
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
-        Choice(Tr("유리 투명도", "Glass transparency"), Tr("클수록 뒤 화면이 더 비칩니다. 유리 효과가 켜져 있을 때 적용됩니다.", "Higher shows more of the screen behind. Applies while the glass effect is on."), G.Palette,
-            new[] { 15, 30, 45, 60, 75 }.Select(x => (x.ToString(inv), $"{x}%")).ToArray(), s.GlassTransparency.ToString(inv), v =>
+        Level(Tr("유리 투명도", "Glass transparency"), Tr("클수록 뒤 화면이 더 비칩니다. 유리 효과가 켜져 있을 때 적용됩니다.", "Higher shows more of the screen behind. Applies while the glass effect is on."), G.Palette,
+            s.GlassTransparency, 15, 75, 5, v => $"{v}%", v =>
             {
-                s.GlassTransparency = int.Parse(v, inv);
-                Theme.Apply(s.Theme);
+                s.GlassTransparency = v;
+                Theme.P.Glass(v);
             }, filter);
         var gpuSw = Toggle(s.GpuDrawing, v =>
         {
