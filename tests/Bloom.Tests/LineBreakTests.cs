@@ -67,6 +67,21 @@ internal static class LineBreakTests
         Check.Eq(link.Copy(0, link.Text.Length), url, "and copies whole");
     }
 
+    public static void CodeBreaksBeforeOpeningBrackets()
+    {
+        var env = Env();
+        var t = Shaped(env, T("Shader.Find(\"Hidden/Blit\") a[0] f{x} ((y)) .(z)", MdStyle.Code));
+        string text = t.Text;
+        var before = t.Opportunities.Where(k => text[k] is '(' or '[' or '{' && text[k - 1] != ' ').Select(k => text[(k - 1)..(k + 1)]).ToArray();
+        Check.Eq(string.Join(" ", before), "d( a[ f{", "before a bracket that follows a letter or digit only");
+        Check.True(!LineBreaks.Opportunities("Find(x)").Contains(4), "not in prose");
+        // a table cell's width: "Shader.Find" / "(\"Hidden/Blit\")", as FlowDocument wrapped it
+        var cell = Shaped(env, T("Shader.Find(\"Hidden/Blit\")", MdStyle.Code));
+        int open = cell.Text.IndexOf('(');
+        var starts = cell.Break(cell.X[cell.Text.Length] - cell.X[open] + 1);
+        Check.Eq(string.Join(",", starts), $"0,{open}", "two lines, the second from the bracket");
+    }
+
     public static void ClustersStayWhole()
     {
         var env = Env();
@@ -105,6 +120,77 @@ internal static class LineBreakTests
         Check.Eq(string.Join(",", t.Break(1000)), "0,4", "a hard break starts a line");
         Check.Eq(t.Copy(0, t.Text.Length), "one\r\ntwo", "copied as a line break");
         Check.Eq(t.X[4], 0f, "the next segment starts at 0");
+    }
+
+    /// A line is its pieces' drawing clipped to it: no ink of a character on the line before or after may show (the
+    /// foot of an "A" starting the next line), at any DPI or size, in prose, bold, italic and code.
+    public static void LinesShowOnlyTheirOwnInk()
+    {
+        int beforeA = 0;
+        foreach (double ppd in new[] { 1.0, 1.25, 1.5, 2.0 })
+            foreach (double size in new[] { 13.0, 14, 18 }) // 13: a table cell's at the default text size
+            {
+                var env = new MdEnv(size, true, ppd);
+                var t = MdText.Of([T("수동 여부 Northwind이 API는없음 Wave Away Java "), T("Tokyo Value ", MdStyle.Italic), T("Year AWAY ", MdStyle.Bold), T("fly "), T("Shader.Find(\"Hidden/Blit\")", MdStyle.Code), T(" 日本語のテキストです。Vault")], env, size, FontWeights.Normal, System.Windows.Media.Brushes.White, null);
+                t.Shape(env);
+                for (double width = 40; width <= 400; width += 23)
+                {
+                    var starts = t.Break(width);
+                    for (int k = 0; k < starts.Length; k++)
+                    {
+                        int s = starts[k], e = t.LineEnd(starts, k);
+                        if (t.Text.AsSpan(e).StartsWith("API")) beforeA++;
+                        // a table cell's text starts between pixels; drawn at its DPI, and at 96 (a capture's)
+                        foreach (double at in new[] { ppd, 1.0 }.Distinct())
+                            for (double frac = 0; frac < 1; frac += 0.125)
+                            {
+                                var drawn = Ink(t, env, s, e, false, at, frac);
+                                var own = Ink(t, env, s, e, true, at, frac);
+                                string? leak = Leak(drawn, own);
+                                Check.True(leak is null, $"{ppd} ppd drawn at {at}, {size} px, width {width}, +{frac}: line \"{t.Text[s..e]}\" shows ink not its own at {leak}");
+                            }
+                    }
+                }
+            }
+        Check.True(beforeA > 0, "some line ends just before \"API\"");
+    }
+
+    private const double InkMargin = 24; // room each side for overhang (and any leak) to land in
+
+    /// The line's alpha at `ppd`, its first character at InkMargin.
+    private static (byte[] A, int W, int H) Ink(MdText t, MdEnv env, int s, int e, bool alone, double ppd, double frac)
+    {
+        double wide = t.X[e] - t.X[s] + InkMargin * 2 + 40, high = env.M.Size * 3;
+        int w = (int)Math.Ceiling(wide * ppd), h = (int)Math.Ceiling(high * ppd);
+        var v = new System.Windows.Media.DrawingVisual();
+        using (var dc = v.RenderOpen()) t.DrawLine(dc, env, s, e, InkMargin + frac / ppd, env.M.Size * 0.5, env.M.CellLine, env.M.CellLine, alone);
+        var bmp = new System.Windows.Media.Imaging.RenderTargetBitmap(w, h, 96 * ppd, 96 * ppd, System.Windows.Media.PixelFormats.Pbgra32);
+        bmp.Render(v);
+        var px = new byte[w * h * 4];
+        bmp.CopyPixels(px, w * 4, 0);
+        var a = new byte[w * h];
+        for (int i = 0; i < a.Length; i++) a[i] = px[i * 4 + 3];
+        return (a, w, h);
+    }
+
+    /// Where `drawn` has clear ink that `own` lacks within a pixel each way (shaping alone may move a glyph a fraction
+    /// of a pixel), or null.
+    private static string? Leak((byte[] A, int W, int H) drawn, (byte[] A, int W, int H) own)
+    {
+        for (int y = 0; y < drawn.H; y++)
+            for (int x = 0; x < drawn.W; x++)
+            {
+                if (drawn.A[y * drawn.W + x] < 24) continue;
+                bool near = false;
+                for (int dy = -1; dy <= 1 && !near; dy++)
+                    for (int dx = -1; dx <= 1 && !near; dx++)
+                    {
+                        int yy = y + dy, xx = x + dx;
+                        near = yy >= 0 && yy < own.H && xx >= 0 && xx < own.W && own.A[yy * own.W + xx] > 0;
+                    }
+                if (!near) return $"({x}, {y}) px";
+            }
+        return null;
     }
 
     public static void LinesFitAndMatchTheirShaping()

@@ -613,8 +613,9 @@ internal sealed class MdText
     }
 
     /// The line from `s` to `e` drawn with its top at (x, y), `height` high (`lineHeight` 0: the font's own): inline
-    /// code's tint under it, its pictures, then its text — the pieces it lies in, moved and clipped to it.
-    public void DrawLine(DrawingContext dc, MdEnv env, int s, int e, double x, double y, double lineHeight, double height)
+    /// code's tint under it, its pictures, then its text — the pieces it lies in, moved and clipped to it. `alone`
+    /// (tests): its text formatted on its own instead, what the line should show.
+    public void DrawLine(DrawingContext dc, MdEnv env, int s, int e, double x, double y, double lineHeight, double height, bool alone = false)
     {
         if (e <= s || pieces.Count == 0) return;
         double dy = lineHeight > 0 ? height - lineHeight : 0; // a picture made the line taller: the text sits at its bottom
@@ -637,18 +638,44 @@ internal sealed class MdText
             if (at < s || at >= e || p.Bitmap is not { } bmp) continue;
             dc.DrawImage(bmp.Source, new Rect(x + X[at] - baseX, y + height - p.Height, p.Width, p.Height));
         }
-        for (int k = first; k < pieces.Count && pieces[k].From < e; k++)
+        // A piece holds only its own characters, so it is clipped only where it runs on past the line: halfway into the
+        // spaces where the lines part at spaces (the line's own last glyph may overhang into its half). Where they part
+        // inside a word (Chinese, Japanese, code, a word longer than the line) the two sides' ink may meet or overlap
+        // (kerning, overhang): the line is formatted on its own then, as `alone`.
+        double left = double.NegativeInfinity, right = double.PositiveInfinity;
+        int last = PieceAt(e - 1);
+        if (!alone && s > pieces[first].From)
         {
-            var (from, to) = pieces[k];
-            if (to <= s) continue;
+            int p = LineBreaks.VisibleEnd(Text, pieces[first].From, s);
+            if (p < s) left = x + (X[p] + X[s]) / 2 - baseX;
+            else alone = true;
+        }
+        if (!alone && e < pieces[last].To)
+        {
+            int t = LineBreaks.VisibleEnd(Text, s, e);
+            if (t < e) right = x + (X[t] + X[e]) / 2 - baseX;
+            else alone = true;
+        }
+        if (alone)
+        {
+            using var line = env.Formatter.FormatLine(new Source(this) { End = e }, s, 1e6, new MdParaProps(look, lineHeight), null);
+            line.Draw(dc, new Point(x, y + dy), InvertAxes.None);
+            return;
+        }
+        bool clip = !double.IsInfinity(left) || !double.IsInfinity(right);
+        if (clip)
+        {
+            double l = double.IsInfinity(left) ? x - height * 4 : left, r = double.IsInfinity(right) ? x + X[e] - baseX + height * 4 : right;
+            dc.PushClip(new RectangleGeometry(new Rect(l, y - height, Math.Max(0, r - l), height * 3)));
+        }
+        for (int k = first; k <= last; k++)
+        {
             var (drawing, _) = Piece(env, k, lineHeight);
-            double left = x + X[Math.Max(s, from)] - baseX, right = x + X[Math.Min(e, to)] - baseX;
-            dc.PushClip(new RectangleGeometry(new Rect(left, y - height, Math.Max(0, right - left), height * 3)));
-            dc.PushTransform(new TranslateTransform(x - baseX + X[from], y + dy));
+            dc.PushTransform(new TranslateTransform(x - baseX + X[pieces[k].From], y + dy));
             dc.DrawDrawing(drawing);
             dc.Pop();
-            dc.Pop();
         }
+        if (clip) dc.Pop();
     }
 
     /// The piece the character at `i` was shaped in.
