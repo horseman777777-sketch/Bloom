@@ -50,8 +50,18 @@ internal static class Winget
 
     public static string[] InstallArgs(WingetPackage p) => new[] { "install", "--id", p.Id, "--exact", "--source", p.Source.Length > 0 ? p.Source : "winget", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity" };
 
-    /// The same install, typed in a terminal the user can watch (and copy).
-    public static string CommandLine(WingetPackage p) => "winget " + string.Join(" ", Array.ConvertAll(InstallArgs(p), a => a.Contains(' ') ? $"\"{a}\"" : a));
+    /// The same install, typed in a terminal the user can watch (and copy). The Id and Source come from winget's table
+    /// text, so anything beyond letters, digits and . _ + - is a PowerShell '…' string (never code).
+    public static string CommandLine(WingetPackage p)
+    {
+        string Value(string v) => PlainArg.IsMatch(v) && v[0] != '-' ? v : UserCommands.PsQuote(v);
+        var args = InstallArgs(p);
+        for (int i = 1; i < args.Length; i++)
+            if (args[i - 1] is "--id" or "--source") args[i] = Value(args[i]); // only these two come from outside
+        return "winget " + string.Join(" ", args);
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex PlainArg = new(@"^[A-Za-z0-9._+\-]+$");
 
     private static async Task<(int code, string output)> Run(string exe, string[] args, CancellationToken stop)
     {
