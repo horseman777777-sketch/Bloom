@@ -2087,3 +2087,13 @@ Bloom couldn't open the file	Bloom 无法打开文件
 The file isn't there, or it can't be opened	文件不存在，或无法打开
 The running Bloom didn't answer	正在运行的 Bloom 没有响应
 Bloom wasn't ready within 30 seconds	Bloom 未能在 30 秒内准备就绪
+Win key over admin apps	在管理员应用上也使用 Win 键
+Opens with Win even over apps run as administrator · admin approval to turn on	即使前台是以管理员身份运行的应用，也可用 Win 键打开 · 开启需要管理员批准
+Update the Win-key helper	更新 Win 键助手
+This version of Bloom needs the Win-key helper installed again. Until then, Win does not open Bloom over admin apps.	此版本的 Bloom 需要重新安装 Win 键助手。在此之前，管理员应用在前台时按 Win 键不会打开 Bloom。
+Reinstall	重新安装
+Without admin approval the helper stays installed. It does nothing while off. Remove ‘Bloom Win-key helper’ in Windows Settings › Apps.	未获管理员批准，助手仍保持安装。关闭期间不会运行。可在 Windows 设置 › 应用中删除“Bloom Win-key helper”。
+Win-key helper still installed	Win 键助手仍已安装
+Win-key helper install failed	Win 键助手安装失败
+Could not install the helper. Try again.	无法安装助手。请重试。
+Without admin approval the Win-key helper stays installed. After Bloom is removed, remove ‘Bloom Win-key helper’ in Windows Settings › Apps.	未获管理员批准，Win 键助手未被删除。删除 Bloom 后，请在 Windows 设置 › 应用中删除“Bloom Win-key helper”。

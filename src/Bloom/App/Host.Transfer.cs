@@ -116,6 +116,14 @@ internal sealed partial class Host
         if (data == MessageBoxResult.Cancel) return false;
         bool wipe = data == MessageBoxResult.Yes;
         if (!DocWindow.SettleAll()) return false; // a document's edits not in its file yet: asked before anything starts
+        // the elevated Win-key helper is outside Bloom's folder: its own removal, with the admin's approval
+        if (ElevatedWinKey.Offered && ElevatedWinKey.Check() != ElevatedWinKey.Copy.None)
+        {
+            winKeyAdmin?.Dispose();
+            winKeyAdmin = null;
+            if (ElevatedWinKey.RunElevated("--remove").GetAwaiter().GetResult() != ElevatedWinKey.Elevated.Done)
+                Tell(owner, WinKeyLeftTitle, Tr("관리자 승인을 받지 못해 Win 키 도우미는 삭제되지 않았습니다. Bloom 삭제 후 Windows 설정 › 앱에서 ‘Bloom Win-key helper’를 삭제하세요.", "Without admin approval the Win-key helper stays installed. After Bloom is removed, remove ‘Bloom Win-key helper’ in Windows Settings › Apps."));
+        }
         if (!StartSuccessor("--uninstall-from", wipe ? new[] { "--wipe" } : Array.Empty<string>()))
         {
             Tell(owner, Tr("삭제 실패", "Uninstall failed"), Tr("Bloom을 다시 시작하지 못했습니다. 삭제된 데이터는 없습니다. Bloom을 다시 열고 시도하세요.", "Could not restart Bloom. No data was deleted. Reopen Bloom and try again."));

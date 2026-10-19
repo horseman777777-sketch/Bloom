@@ -34,6 +34,8 @@ internal sealed partial class Host
     /// The AI 채팅 window while it shows (else zero): what a tool the AI brings up floats beside.
     public IntPtr ChatWindowHandle => chatWindow is { IsVisible: true } c ? new System.Windows.Interop.WindowInteropHelper(c).Handle : IntPtr.Zero;
     private WinKeyHook? winKey;
+    private ElevatedWinKey? winKeyAdmin;
+    private bool winKeyOffered; // the reinstall of a helper of another protocol was offered this run
     private StallWatch? stalls;
     private Tray? tray;
     private Dispatcher ui = null!;
@@ -334,7 +336,75 @@ internal sealed partial class Host
             winKey.Dispose();
             winKey = null;
         }
+        // over apps run as administrator: the elevated helper beside the hook, never instead of it
+        bool wantAdmin = wantHook && Settings.Current.WinKeyAdmin && ElevatedWinKey.Offered;
+        if (wantAdmin && winKeyAdmin is null) StartWinKeyAdmin();
+        else if (!wantAdmin && winKeyAdmin is not null)
+        {
+            winKeyAdmin.Dispose();
+            winKeyAdmin = null;
+        }
     }
+
+    private void StartWinKeyAdmin()
+    {
+        switch (ElevatedWinKey.Check())
+        {
+            case ElevatedWinKey.Copy.Ready:
+                winKeyAdmin = ElevatedWinKey.Start(SummonByKey);
+                break;
+            case ElevatedWinKey.Copy.None: // removed outside Bloom (Windows' Apps list): the switch is off again
+                Log.Write("win-key helper not installed: switched off");
+                Settings.Current.WinKeyAdmin = false;
+                Settings.Save();
+                break;
+            case ElevatedWinKey.Copy.Other when !winKeyOffered:
+                winKeyOffered = true;
+                ui.BeginInvoke(OfferWinKeyReinstall);
+                break;
+        }
+    }
+
+    /// The installed helper speaks another protocol (an update changed it): installing it again needs the admin.
+    private async void OfferWinKeyReinstall()
+    {
+        if (ConfirmWindow.Ask(null, Tr("Win 키 도우미 업데이트", "Update the Win-key helper"),
+                Tr("이 버전의 Bloom에 맞게 Win 키 도우미를 다시 설치해야 합니다. 설치 전까지 관리자 앱 위에서는 Win 키로 Bloom이 열리지 않습니다.", "This version of Bloom needs the Win-key helper installed again. Until then, Win does not open Bloom over admin apps."),
+                (Tr("다시 설치", "Reinstall"), MessageBoxResult.Yes), (Tr("나중에", "Later"), MessageBoxResult.No)) != MessageBoxResult.Yes) return;
+        var r = await ElevatedWinKey.RunElevated("--install");
+        if (r == ElevatedWinKey.Elevated.Done) ApplyHotkeys();
+        else if (r == ElevatedWinKey.Elevated.Failed) TellWinKeyInstallFailed(null);
+    }
+
+    /// 설정 › 일반 › 관리자 앱 위에서도 Win 키: on installs the helper (UAC), off stops and removes it (UAC). Returns
+    /// the switch's state after: a declined or failed install leaves it off.
+    public async System.Threading.Tasks.Task<bool> SetWinKeyAdmin(bool on, System.Windows.Window? owner)
+    {
+        if (on)
+        {
+            var r = await ElevatedWinKey.RunElevated("--install");
+            if (r != ElevatedWinKey.Elevated.Done)
+            {
+                if (r == ElevatedWinKey.Elevated.Failed) TellWinKeyInstallFailed(owner);
+                return false;
+            }
+            Settings.Current.WinKeyAdmin = true;
+            Settings.Save();
+            ApplyHotkeys();
+            return true;
+        }
+        Settings.Current.WinKeyAdmin = false;
+        Settings.Save();
+        ApplyHotkeys(); // the helper is told to stop before it is removed
+        if (await ElevatedWinKey.RunElevated("--remove") != ElevatedWinKey.Elevated.Done)
+            ConfirmWindow.Tell(owner, WinKeyLeftTitle, Tr("관리자 승인을 받지 못해 도우미가 설치된 채로 남았습니다. 꺼진 동안에는 동작하지 않습니다. Windows 설정 › 앱에서 ‘Bloom Win-key helper’를 삭제할 수 있습니다.", "Without admin approval the helper stays installed. It does nothing while off. Remove ‘Bloom Win-key helper’ in Windows Settings › Apps."));
+        return false;
+    }
+
+    private static string WinKeyLeftTitle => Tr("Win 키 도우미 남음", "Win-key helper still installed");
+
+    private static void TellWinKeyInstallFailed(System.Windows.Window? owner) =>
+        ConfirmWindow.Tell(owner, Tr("Win 키 도우미 설치 실패", "Win-key helper install failed"), Tr("도우미를 설치하지 못했습니다. 다시 시도하세요.", "Could not install the helper. Try again."));
 
     public void OpenView(Mode mode, string text = "")
     {
@@ -579,6 +649,7 @@ internal sealed partial class Host
         DocWindow.Quitting();
         Chats.Shutdown(save);
         winKey?.Dispose();
+        winKeyAdmin?.Dispose();
         Clipboard.Dispose();
         Shortcuts?.Dispose();
         tray?.Dispose();

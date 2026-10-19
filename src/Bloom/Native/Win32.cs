@@ -342,8 +342,26 @@ internal static class Win32
     private struct TOKEN_PRIVILEGES { public uint PrivilegeCount; public long Luid; public uint Attributes; }
 
     [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
-    [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll")] public static extern uint WaitForSingleObject(IntPtr h, uint ms);
+    [DllImport("kernel32.dll")] public static extern bool GetExitCodeProcess(IntPtr process, out uint code);
     [DllImport("advapi32.dll", SetLastError = true)] private static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool GetTokenInformation(IntPtr token, int infoClass, out int info, int length, out int returned);
+
+    /// This process runs with an administrator account's limited token (UAC's split token), the one case where an
+    /// elevated window of the same user can take the focus away from Bloom's hook.
+    public static bool LimitedAdminToken()
+    {
+        if (!OpenProcessToken(GetCurrentProcess(), 0x0008 /* TOKEN_QUERY */, out IntPtr token)) return false;
+        try
+        {
+            return GetTokenInformation(token, 18 /* TokenElevationType */, out int type, sizeof(int), out _) && type == 3 /* TokenElevationTypeLimited */;
+        }
+        finally
+        {
+            CloseHandle(token);
+        }
+    }
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern bool LookupPrivilegeValue(string? system, string name, out long luid);
     [DllImport("advapi32.dll", SetLastError = true)] private static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TOKEN_PRIVILEGES state, int length, IntPtr previous, IntPtr returnLength);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool ExitWindowsEx(uint flags, uint reason);

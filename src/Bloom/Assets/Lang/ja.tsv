@@ -2087,3 +2087,13 @@ Bloom couldn't open the file	Bloom でファイルを開けませんでした
 The file isn't there, or it can't be opened	ファイルが見つからないか、開けないファイルです
 The running Bloom didn't answer	実行中の Bloom から応答がありませんでした
 Bloom wasn't ready within 30 seconds	Bloom が 30 秒以内に準備できませんでした
+Win key over admin apps	管理者アプリの上でも Win キーを使用
+Opens with Win even over apps run as administrator · admin approval to turn on	管理者として実行中のアプリが前面にあっても Win キーで開きます · オンにするには管理者の承認が必要
+Update the Win-key helper	Win キー ヘルパーの更新
+This version of Bloom needs the Win-key helper installed again. Until then, Win does not open Bloom over admin apps.	このバージョンの Bloom に合わせて Win キー ヘルパーを再インストールする必要があります。それまでは管理者アプリの上で Win キーを押しても Bloom は開きません。
+Reinstall	再インストール
+Without admin approval the helper stays installed. It does nothing while off. Remove ‘Bloom Win-key helper’ in Windows Settings › Apps.	管理者の承認がないため、ヘルパーはインストールされたままです。オフの間は動作しません。Windows の設定 › アプリで「Bloom Win-key helper」を削除できます。
+Win-key helper still installed	Win キー ヘルパーが残っています
+Win-key helper install failed	Win キー ヘルパーのインストール失敗
+Could not install the helper. Try again.	ヘルパーをインストールできませんでした。もう一度お試しください。
+Without admin approval the Win-key helper stays installed. After Bloom is removed, remove ‘Bloom Win-key helper’ in Windows Settings › Apps.	管理者の承認がないため、Win キー ヘルパーは削除されませんでした。Bloom の削除後、Windows の設定 › アプリで「Bloom Win-key helper」を削除してください。

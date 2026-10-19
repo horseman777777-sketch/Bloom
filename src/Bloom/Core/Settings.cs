@@ -14,6 +14,7 @@ internal sealed class Settings
     public string IconStyle { get; set; } = "tile"; // favorites' picture icons: soft (rose tint) | tile (Bloom's neutral tile) | card (raised card) | black
     public string Accent { get; set; } = "rose"; // Ui.Accents key: rose | lavender | sky | mint | tangerine | lemon | gray
     public bool WinKey { get; set; } = true;
+    public bool WinKeyAdmin { get; set; } // the Win key over apps run as administrator: the elevated helper (App\ElevatedWinKey.cs)
     public bool AltSpace { get; set; } = true;
     public bool Autostart { get; set; } = true;
     public bool UpdateCheck { get; set; } = true; // one look at GitHub Releases a little after each start (App\Updates.cs)

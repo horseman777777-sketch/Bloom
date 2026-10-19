@@ -32,6 +32,13 @@ internal sealed partial class SettingsView
         var winSw = Toggle(s.WinKey, v => { s.WinKey = v; host.ApplyHotkeys(); }, out var winT);
         string winSub = Tr("Win 키만 눌렀다 떼면 열립니다 (Win+E 같은 조합은 그대로)", "Tap Win alone to open (combinations like Win+E still work)");
         Add(Tr("Win 키로 열기", "Open with the Win key"), winSub, winSw, G.Keyboard, winT, null, filter);
+        if (ElevatedWinKey.Offered)
+        {
+            // the switch follows the outcome: a declined UAC prompt leaves it off
+            Switch? adminSw = null;
+            adminSw = Toggle(s.WinKeyAdmin, async v => adminSw!.On = await host.SetWinKeyAdmin(v, Window.GetWindow(this)), out var adminT);
+            Add(Tr("관리자 앱 위에서도 Win 키 사용", "Win key over admin apps"), Tr("관리자 권한 앱이 앞에 있어도 Win 키로 열립니다 · 켤 때 관리자 승인 필요", "Opens with Win even over apps run as administrator · admin approval to turn on"), adminSw, G.Shield, adminT, null, filter);
+        }
         var altSw = Toggle(s.AltSpace, v => { s.AltSpace = v; host.ApplyHotkeys(); }, out var altT);
         string altSub = host.AltSpaceStatus switch { "taken" => Tr("다른 앱에서 사용 중", "Another app uses it"), "ok" => Tr("켜짐", "On"), _ => Tr("꺼짐", "Off") };
         Add(Tr("Alt + Space로 열기", "Open with Alt + Space"), altSub, altSw, G.Keyboard, altT, null, filter);
