@@ -19,6 +19,15 @@ internal static class WinKeyHelperTests
             Check.Eq(WinKeyProtocol.ParsePid(bad), null, $"«{bad}» refused");
     }
 
+    /// The hand-made Task Scheduler vtable calls a normal user can make (connect, find the \Bloom folder and this
+    /// user's task in it) run against the real service without a COM error; nothing is registered.
+    public static void TaskSchedulerAnswers()
+    {
+        string sid = System.Security.Principal.WindowsIdentity.GetCurrent().User!.Value;
+        using var ts = TaskService.Connect();
+        _ = ts.Exists(sid); // a wrong slot or a failed call throws (or crashes) here
+    }
+
     public static void OnlyBloomExe()
     {
         Check.True(WinKeyProtocol.IsBloomImage(@"C:\Users\a\AppData\Local\BloomLauncher\current\Bloom.exe"), "the installed Bloom");
@@ -66,7 +75,7 @@ internal static class WinKeyHelperTests
         Check.Eq(V("Settings", "IdleSettings", "StopOnIdleEnd"), "false", "idle end");
         Check.True(doc.Root!.Element(t + "Triggers") is null, "no trigger");
         Check.Eq(V("Actions", "Exec", "Command"), "\"" + exe + "\"", "the installed copy, quoted, absolute");
-        Check.Eq(V("Actions", "Exec", "Arguments"), "$(Arg0)", "Bloom's pid");
+        Check.Eq(V("Actions", "Exec", "Arguments"), "--serve $(Arg0)", "Bloom's pid, always behind --serve (never --install/--remove)");
         Check.Eq(V("Actions", "Exec", "WorkingDirectory"), dir, "its folder");
     }
 

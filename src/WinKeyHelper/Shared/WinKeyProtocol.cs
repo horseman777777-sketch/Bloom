@@ -53,6 +53,10 @@ internal static class WinKeyProtocol
     /// The \Bloom folder: every signed-in user may find their task in it, none may add to it.
     public const string FolderSddl = "O:BAG:SYD:P(A;;FA;;;BA)(A;;FA;;;SY)(A;;FRFX;;;AU)";
 
+    /// The task's fixed first argument: anyone of this user may run the task with any $(Arg0), and behind it that
+    /// can only ever be a process id to serve, never --install or --remove run elevated.
+    public const string ServeArg = "--serve";
+
     /// The task: no trigger (Bloom runs it, its process id as $(Arg0)), the user's own sign-in, the full admin
     /// token, no time limit, not held back on battery, normal priority, one copy per run asked for.
     public static string TaskXml(string sid, string exe, string dir) => $"""
@@ -91,7 +95,7 @@ internal static class WinKeyProtocol
           <Actions Context="Author">
             <Exec>
               <Command>"{SecurityElement.Escape(exe)}"</Command>
-              <Arguments>$(Arg0)</Arguments>
+              <Arguments>{ServeArg} $(Arg0)</Arguments>
               <WorkingDirectory>{SecurityElement.Escape(dir)}</WorkingDirectory>
             </Exec>
           </Actions>

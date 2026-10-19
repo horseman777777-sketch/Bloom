@@ -13,7 +13,7 @@ namespace Bloom.WinKey;
 /// WinKeyHelper.exe (issue #3): Bloom's Win key over apps run as administrator. Bloom's own hook runs at medium
 /// integrity and Windows keeps it blind while an elevated window has focus; this copy runs elevated (a task Bloom
 /// starts) and does only that: a lone Win press → the Start menu stays closed and Bloom is told.
-///   WinKeyHelper.exe <Bloom's pid>   serve that Bloom until it ends or sets the Stop event
+///   WinKeyHelper.exe --serve <pid>   (the task) serve that Bloom until it ends or sets the Stop event
 ///   WinKeyHelper.exe --install       (elevated) copy to Program Files, register this user's task, add the Apps entry
 ///   WinKeyHelper.exe --remove        (elevated) this user's task gone; the copy and the entry too when no task is left
 /// No settings, no log, no user folders. Exit code 0 = done.
@@ -28,10 +28,11 @@ internal static unsafe class Program
 
     private static int Main(string[] args)
     {
-        if (args.Length != 1) return 2;
         try
         {
-            return args[0] switch { "--install" => Install(), "--remove" => Remove(), _ => Serve(args[0]) };
+            // the task always passes --serve first, so what a caller puts in $(Arg0) is never read as --install/--remove
+            if (args.Length == 2 && args[0] == WinKeyProtocol.ServeArg) return Serve(args[1]);
+            return args.Length != 1 ? 2 : args[0] switch { "--install" => Install(), "--remove" => Remove(), _ => 2 };
         }
         catch (Exception)
         {
