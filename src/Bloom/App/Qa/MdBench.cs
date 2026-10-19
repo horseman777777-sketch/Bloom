@@ -29,7 +29,7 @@ internal static class MdBench
 
     private sealed class Round
     {
-        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs;
+        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs, SliceMaxMs;
         public int ScrollSteps, Stalls50, Stalls100;
         public bool SweptAll;
     }
@@ -92,6 +92,7 @@ internal static class MdBench
                 Line(text, "outside edit settle ms", results, x => x.OutsideMs);
                 Line(text, "outside edit longest UI gap ms", results, x => x.OutsideGapMs);
                 Line(text, "longest UI gap overall ms", results, x => x.MaxGapMs);
+                Line(text, "longest idle layout slice ms", results, x => x.SliceMaxMs);
                 Line(text, "stalls ≥ 50 ms (count)", results, x => x.Stalls50);
                 Line(text, "stalls ≥ 100 ms (count)", results, x => x.Stalls100);
                 text.AppendLine($"  scroll steps per round: {string.Join(", ", results.Select(x => x.ScrollSteps + (x.SweptAll ? "" : " (capped)")))}");
@@ -294,6 +295,7 @@ internal static class MdBench
         r.OutsideMs = watch.Elapsed.TotalMilliseconds - t0;
         r.OutsideGapMs = probe.Longest(mark);
         await Task.Delay(300);
+        r.SliceMaxMs = view.Surface.LongestSliceMs;
 
         d.Close();
         await Idle();

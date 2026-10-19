@@ -1,0 +1,575 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.TextFormatting;
+using Bloom.Core;
+
+namespace Bloom.Ui;
+
+/// How a run of the view's text is drawn (TextFormatter's run properties): one per look, kept by MdEnv.
+internal sealed class MdRunProps : TextRunProperties
+{
+    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("en-US"); // a FlowDocument's own (xml:lang en-US)
+
+    public MdRunProps(Typeface face, double size, Brush brush, TextDecorationCollection? decorations, double pixelsPerDip)
+    {
+        Typeface = face;
+        FontRenderingEmSize = size;
+        ForegroundBrush = brush;
+        TextDecorations = decorations;
+        PixelsPerDip = pixelsPerDip;
+    }
+
+    public override Typeface Typeface { get; }
+    public override double FontRenderingEmSize { get; }
+    public override double FontHintingEmSize => FontRenderingEmSize;
+    public override TextDecorationCollection? TextDecorations { get; }
+    public override Brush ForegroundBrush { get; }
+    public override Brush? BackgroundBrush => null;
+    public override CultureInfo CultureInfo => Culture;
+    public override TextEffectCollection? TextEffects => null;
+}
+
+/// A line of the view's text: never wrapped by TextFormatter (MdView breaks lines itself), left to right, `lineHeight` high.
+internal sealed class MdParaProps(TextRunProperties props, double lineHeight) : TextParagraphProperties
+{
+    public override FlowDirection FlowDirection => FlowDirection.LeftToRight;
+    public override TextAlignment TextAlignment => TextAlignment.Left;
+    public override double LineHeight => lineHeight;
+    public override bool FirstLineInParagraph => true;
+    public override TextRunProperties DefaultTextRunProperties => props;
+    public override TextWrapping TextWrapping => TextWrapping.NoWrap;
+    public override TextMarkerProperties? TextMarkerProperties => null;
+    public override double Indent => 0;
+}
+
+/// Something drawn in a line rather than shaped (a picture, inline code's padding, a tab): only its width counts here;
+/// MdText draws pictures itself.
+internal sealed class MdObject(double width, TextRunProperties props) : TextEmbeddedObject
+{
+    public override LineBreakCondition BreakBefore => LineBreakCondition.BreakPossible;
+    public override LineBreakCondition BreakAfter => LineBreakCondition.BreakPossible;
+    public override bool HasFixedSize => true;
+    public override CharacterBufferReference CharacterBufferReference => new(LineBreaks.ObjectChar.ToString(), 0);
+    public override int Length => 1;
+    public override TextRunProperties Properties => props;
+    public override TextEmbeddedObjectMetrics Format(double remainingParagraphWidth) => new(width, 0, 0);
+    public override Rect ComputeBoundingBox(bool rightToLeft, bool sideways) => new(0, 0, width, 0);
+    public override void Draw(DrawingContext drawingContext, Point origin, bool rightToLeft, bool sideways)
+    {
+    }
+}
+
+/// A picture in a text: where it comes from and, once its file's header is read (MdPictures), its size.
+internal sealed class MdPicture(string path, string alt)
+{
+    public readonly string Path = path, Alt = alt;
+    public DateTime Written;
+    public int PixelWidth, PixelHeight, Decoding;
+    public double DipWidth, DipHeight;
+    public bool Ready, Missing, Asked;
+    public BitmapRef? Bitmap; // decoded for the width it's drawn at
+    public double Width, Height; // as laid out (fitted to the line)
+}
+
+/// A decoded picture at a pixel width (shared through MdPictures' cache).
+internal sealed class BitmapRef(System.Windows.Media.Imaging.BitmapSource source, int width)
+{
+    public readonly System.Windows.Media.Imaging.BitmapSource Source = source;
+    public readonly int Width = width;
+}
+
+/// The view's shared settings and tools at one text size and DPI: the TextFormatter (Display mode, as every window
+/// draws), the metrics, and the run looks.
+internal sealed class MdEnv
+{
+    public readonly TextFormatter Formatter = TextFormatter.Create(TextFormattingMode.Display);
+    public readonly MdMetrics M;
+    public readonly double Ppd;
+    private readonly Dictionary<(FontFamily, FontWeight, FontStyle, double, Brush, bool), MdRunProps> props = [];
+    private readonly Dictionary<MdRunProps, double> spaces = [];
+    private double pad = -1;
+
+    public MdEnv(double size, bool document, double pixelsPerDip)
+    {
+        M = new MdMetrics(size, document);
+        Ppd = pixelsPerDip;
+    }
+
+    public MdRunProps Props(FontFamily family, FontWeight weight, FontStyle style, double size, Brush brush, bool strike = false)
+    {
+        var key = (family, weight, style, size, brush, strike);
+        if (!props.TryGetValue(key, out var p))
+            props[key] = p = new MdRunProps(new Typeface(family, style, weight, FontStretches.Normal), size, brush, strike ? TextDecorations.Strikethrough : null, Ppd);
+        return p;
+    }
+
+    /// Inline code's padding each side: a figure space of the code's font (what chat draws there).
+    public double Pad
+    {
+        get
+        {
+            if (pad < 0) pad = Measure("0", Props(Theme.Mono, FontWeights.Normal, FontStyles.Normal, M.CodeSize, Theme.P.Text));
+            return pad;
+        }
+    }
+
+    /// A tab: four spaces of its run's font.
+    public double Tab(MdRunProps p)
+    {
+        if (!spaces.TryGetValue(p, out double w)) spaces[p] = w = Measure(" ", p);
+        return 4 * w;
+    }
+
+    private readonly Dictionary<(MdRunProps, double), (double Baseline, double Height)> lines = [];
+
+    /// Where the baseline of a line in look `p`, `lineHeight` high (0: the font's own), is below its top, and how high
+    /// the line is.
+    public (double Baseline, double Height) LineOf(MdRunProps p, double lineHeight)
+    {
+        if (!lines.TryGetValue((p, lineHeight), out var m))
+        {
+            var t = MdText.Plain("0", p);
+            t.Shape(this);
+            using var line = Formatter.FormatLine(MdText.Probe(t), 0, 1e6, new MdParaProps(p, lineHeight), null);
+            lines[(p, lineHeight)] = m = (line.Baseline, line.Height);
+        }
+        return m;
+    }
+
+    /// A short text's width on one line.
+    public double Measure(string text, MdRunProps p)
+    {
+        var t = new MdText(text, [0], [p], [], [], [], []);
+        t.Shape(this);
+        return t.Widest;
+    }
+
+    /// Drawn snapped to device pixels.
+    public double Snap(double v) => Math.Round(v * Ppd) / Ppd;
+}
+
+/// One text of the view (a paragraph's, a heading's, a list item's, a table cell's, a code block's, a label's) in its
+/// looks, shaped once on one unbroken line per segment (between hard breaks: '\n') — each character's x — and broken
+/// into lines at any width by arithmetic (LineBreaks). Pictures, inline code's padding and tabs are in the text as one
+/// character each (LineBreaks.ObjectChar, PadChar, '\t') and drawn, not shaped. Very long segments are shaped in pieces
+/// of about 4,000 characters cut where a line may break.
+internal sealed class MdText
+{
+    private const int Chunk = 4000;
+
+    public readonly string Text;
+    private readonly int[] runStarts; // each run's start, the first 0
+    private readonly MdRunProps[] runProps;
+    public readonly (int Start, int End, MdLink Link)[] Links;
+    public readonly (int Start, int End)[] Code; // inline code with its padding, or a code block's whole text
+    public readonly (int Start, int End, string Copy)[] CopyAs; // what a span gives when copied whole (an autolink)
+    public readonly (int At, MdPicture Picture)[] Pictures;
+    private readonly bool codeTint;
+    private int[]? objectsAt; // where the text has an object character, in order
+    private MdObject?[]? objects;
+
+    public float[] X = [];
+    public int[] Opportunities = [];
+    private bool[]? graphemes;
+    public bool Shaped;
+
+    /// The widest segment (a table column's natural width adds these up).
+    public double Widest;
+
+    public MdText(string text, int[] runStarts, MdRunProps[] runProps, (int, int, MdLink)[] links, (int, int)[] code, (int, int, string)[] copyAs, (int, MdPicture)[] pictures, bool codeTint = false)
+    {
+        Text = text;
+        this.runStarts = runStarts;
+        this.runProps = runProps;
+        Links = links;
+        Code = code;
+        CopyAs = copyAs;
+        Pictures = pictures;
+        this.codeTint = codeTint;
+    }
+
+    /// The text of `spans` in a block's look: `size`, `weight` and `brush` for plain text; code in Mono at the metrics'
+    /// code size with padding each side; links in the accent; pictures (MdPictures) or, for one on the web, a link with
+    /// its alt text, and for one that can't be shown its alt text, faint.
+    public static MdText Of(List<MdSpan> spans, MdEnv env, double size, FontWeight weight, Brush brush, string? baseDir)
+    {
+        var sb = new StringBuilder();
+        var starts = new List<int>();
+        var looks = new List<MdRunProps>();
+        var links = new List<(int, int, MdLink)>();
+        var code = new List<(int, int)>();
+        var copy = new List<(int, int, string)>();
+        var pictures = new List<(int, MdPicture)>();
+        void Look(MdRunProps p)
+        {
+            if (looks.Count > 0 && looks[^1] == p) return;
+            if (starts.Count > 0 && starts[^1] == sb.Length)
+            {
+                looks[^1] = p;
+                return;
+            }
+            starts.Add(sb.Length);
+            looks.Add(p);
+        }
+        foreach (var s in spans)
+        {
+            var w = (s.Style & MdStyle.Bold) != 0 ? FontWeights.Bold : weight;
+            var st = (s.Style & MdStyle.Italic) != 0 ? FontStyles.Italic : FontStyles.Normal;
+            bool strike = (s.Style & MdStyle.Strike) != 0;
+            int at = sb.Length;
+            if (s.Kind == MdSpanKind.Break)
+            {
+                Look(env.Props(Theme.Sans, w, st, size, brush));
+                sb.Append('\n');
+                continue;
+            }
+            if (s.Kind == MdSpanKind.Picture)
+            {
+                string shown = s.Text.Length > 0 ? s.Text : s.Source ?? "";
+                string src = s.Source ?? "";
+                if (src.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || src.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    // a picture on the web: a link with its alt text (nothing is fetched just by showing the text)
+                    Look(env.Props(Theme.Sans, w, st, size, Theme.P.AccentText, strike));
+                    sb.Append(shown);
+                    links.Add((at, sb.Length, new MdLink(src)));
+                }
+                else if (DocLink.Picture(src, baseDir) is { } path && MdPictures.Known(path) is not { Missing: true })
+                {
+                    Look(env.Props(Theme.Sans, w, st, size, brush));
+                    sb.Append(LineBreaks.ObjectChar);
+                    var picture = new MdPicture(path, s.Text);
+                    MdPictures.Fill(picture);
+                    pictures.Add((at, picture));
+                }
+                else
+                {
+                    Look(env.Props(Theme.Sans, w, st, size, Theme.P.TextFaint, strike));
+                    sb.Append(shown.Replace('\n', ' '));
+                }
+                continue;
+            }
+            bool isCode = (s.Style & MdStyle.Code) != 0;
+            var look = isCode
+                ? env.Props(Theme.Mono, w, st, env.M.CodeSize, s.Link is null ? brush : Theme.P.AccentText, strike)
+                : env.Props(Theme.Sans, w, st, size, s.Link is null ? brush : Theme.P.AccentText, strike);
+            Look(look);
+            if (isCode) sb.Append(LineBreaks.PadChar);
+            sb.Append(s.Text);
+            if (isCode) sb.Append(LineBreaks.PadChar);
+            if (isCode) code.Add((at, sb.Length));
+            else if (s.Link is not null && (s.Copy is not null || s.Text == s.Link.Url)) code.Add((at, sb.Length)); // an address breaks as code
+            if (s.Link is not null)
+            {
+                if (links.Count > 0 && links[^1].Item3 == s.Link && links[^1].Item2 == at) links[^1] = (links[^1].Item1, sb.Length, s.Link);
+                else links.Add((at, sb.Length, s.Link));
+            }
+            if (s.Copy is not null) copy.Add((at, sb.Length, s.Copy));
+        }
+        if (starts.Count == 0)
+        {
+            starts.Add(0);
+            looks.Add(env.Props(Theme.Sans, weight, FontStyles.Normal, size, brush));
+        }
+        return new MdText(sb.ToString(), [.. starts], [.. looks], [.. links], [.. code], [.. copy], [.. pictures], codeTint: true);
+    }
+
+    /// A code block's text: one look, lines at '\n', all of it breaking as code.
+    public static MdText OfCode(string code, MdRunProps look) => new(code, [0], [look], [], [(0, code.Length)], [], []);
+
+    /// A one-look text (a list marker, a label).
+    public static MdText Plain(string text, MdRunProps look) => new(text, [0], [look], [], [], [], []);
+
+    public MdRunProps LookAt(int i)
+    {
+        int k = Array.BinarySearch(runStarts, i);
+        if (k < 0) k = ~k - 1;
+        return runProps[Math.Max(k, 0)];
+    }
+
+    private int RunEnd(int i)
+    {
+        int k = Array.BinarySearch(runStarts, i);
+        if (k < 0) k = ~k - 1;
+        return k + 1 < runStarts.Length ? runStarts[k + 1] : Text.Length;
+    }
+
+    public MdPicture? PictureAt(int i)
+    {
+        foreach (var (at, p) in Pictures)
+            if (at == i) return p;
+        return null;
+    }
+
+    /// The link the character at `i` is in.
+    public MdLink? LinkAt(int i)
+    {
+        foreach (var (s, e, l) in Links)
+            if (i >= s && i < e) return l;
+        return null;
+    }
+
+    private void Objects(MdEnv env)
+    {
+        var at = new List<int>();
+        for (int i = 0; i < Text.Length; i++)
+            if (Text[i] is LineBreaks.ObjectChar or LineBreaks.PadChar or '\t') at.Add(i);
+        objectsAt = [.. at];
+        objects = new MdObject?[at.Count];
+        for (int k = 0; k < at.Count; k++)
+        {
+            int i = at[k];
+            var look = LookAt(i);
+            double w = Text[i] switch
+            {
+                LineBreaks.PadChar => env.Pad,
+                '\t' => env.Tab(look),
+                _ => PictureAt(i) is { } p ? p.Width : 0,
+            };
+            objects[k] = new MdObject(w, look);
+        }
+    }
+
+    private MdObject? ObjectAt(int i)
+    {
+        if (objectsAt is null || objects is null) return null;
+        int k = Array.BinarySearch(objectsAt, i);
+        return k >= 0 ? objects[k] : null;
+    }
+
+    private int NextObject(int i)
+    {
+        if (objectsAt is null) return int.MaxValue;
+        int k = Array.BinarySearch(objectsAt, i);
+        if (k < 0) k = ~k;
+        return k < objectsAt.Length ? objectsAt[k] : int.MaxValue;
+    }
+
+    /// The whole text as TextFormatter reads it (MdEnv's line measures).
+    public static TextSource Probe(MdText t) => new Source(t) { End = t.Text.Length };
+
+    /// TextFormatter's view of the text from a start up to End.
+    private sealed class Source(MdText t) : TextSource
+    {
+        public int End;
+
+        public override TextRun GetTextRun(int i)
+        {
+            if (i >= End) return new TextEndOfLine(1);
+            if (t.ObjectAt(i) is { } o) return o;
+            int end = Math.Min(Math.Min(End, t.RunEnd(i)), t.NextObject(i));
+            return new TextCharacters(t.Text, i, end - i, t.LookAt(i));
+        }
+
+        public override TextSpan<CultureSpecificCharacterBufferRange> GetPrecedingText(int limit) =>
+            new(0, new CultureSpecificCharacterBufferRange(CultureInfo.InvariantCulture, CharacterBufferRange.Empty));
+
+        public override int GetTextEffectCharacterIndexFromTextSourceCharacterIndex(int i) => i;
+    }
+
+    /// Shaped (again: the size, the DPI or a picture's size changed): every character's x on its segment's one line,
+    /// and where lines may break.
+    public void Shape(MdEnv env)
+    {
+        Objects(env);
+        Opportunities = LineBreaks.Opportunities(Text, Code);
+        graphemes = null;
+        int n = Text.Length;
+        X = new float[n + 1];
+        Widest = 0;
+        var source = new Source(this);
+        int seg = 0;
+        while (seg <= n)
+        {
+            int segEnd = Text.IndexOf('\n', seg);
+            if (segEnd < 0) segEnd = n;
+            double x0 = 0;
+            for (int from = seg; from < segEnd;)
+            {
+                int to = segEnd;
+                if (to - from > Chunk)
+                {
+                    // cut at the last place a line may break before the chunk's end
+                    int k = Array.BinarySearch(Opportunities, from + Chunk);
+                    if (k < 0) k = ~k - 1;
+                    to = k >= 0 && Opportunities[k] > from ? Opportunities[k] : from + Chunk;
+                    while (to < segEnd && char.IsLowSurrogate(Text[to])) to++;
+                }
+                x0 = ShapePiece(env, source, from, to, x0);
+                from = to;
+            }
+            X[segEnd] = (float)x0;
+            Widest = Math.Max(Widest, x0);
+            seg = segEnd + 1;
+        }
+        Shaped = true;
+    }
+
+    /// One unbroken line from `from` to `to`: each character's x from its glyphs' advances (a cluster's characters share
+    /// its x), objects by their widths. Returns the x at `to`.
+    private double ShapePiece(MdEnv env, Source source, int from, int to, double x0)
+    {
+        source.End = to;
+        var props = new MdParaProps(LookAt(from), 0);
+        int at = from;
+        while (at < to)
+        {
+            using var line = env.Formatter.FormatLine(source, at, 1e6, props, null);
+            double x = x0;
+            int covered = at;
+            foreach (var run in line.GetIndexedGlyphRuns())
+            {
+                int start = run.TextSourceCharacterIndex, len = run.TextSourceLength;
+                for (; covered < start && covered < to; covered++)
+                {
+                    X[covered] = (float)x; // an object before this run
+                    x += ObjectAt(covered) is { } o ? o.Format(0).Width : 0;
+                }
+                var g = run.GlyphRun;
+                var advances = g.AdvanceWidths;
+                var map = g.ClusterMap;
+                int count = advances.Count;
+                var gx = new double[count + 1]; // each glyph's left edge
+                gx[0] = x;
+                for (int k = 0; k < count; k++) gx[k + 1] = gx[k] + advances[k];
+                for (int c = 0; c < len && start + c < to; c++) X[start + c] = (float)gx[map is null ? Math.Min(c, count) : map[c]];
+                x = gx[count];
+                covered = Math.Max(covered, start + len);
+            }
+            int done = at + line.Length - line.NewlineLength;
+            for (; covered < to && covered < done; covered++)
+            {
+                X[covered] = (float)x;
+                x += ObjectAt(covered) is { } o ? o.Format(0).Width : 0;
+            }
+            x0 = x;
+            if (done <= at) break;
+            at = done;
+        }
+        return x0;
+    }
+
+    /// The lines the text makes at `width`: the index each starts at.
+    public int[] Break(double width)
+    {
+        var starts = new List<int>();
+        int n = Text.Length;
+        for (int seg = 0; seg <= n;)
+        {
+            int segEnd = Text.IndexOf('\n', seg);
+            if (segEnd < 0) segEnd = n;
+            LineBreaks.Break(Text, X, Opportunities, seg, segEnd, width, starts, ref graphemes);
+            seg = segEnd + 1;
+        }
+        return [.. starts];
+    }
+
+    /// Where line `k` (of `starts`) ends: before the hard break that ends it, or at the next line's start.
+    public int LineEnd(int[] starts, int k) => k + 1 < starts.Length ? (Text[starts[k + 1] - 1] == '\n' ? starts[k + 1] - 1 : starts[k + 1]) : Text.Length;
+
+    /// The nearest place between grapheme clusters to `x` on the line from `s` to `e` (x from the line's start).
+    public int Hit(int s, int e, double x)
+    {
+        graphemes ??= LineBreaks.Graphemes(Text);
+        double baseX = X[s];
+        int best = s;
+        double bestD = double.MaxValue;
+        int lo = s, hi = e;
+        // the first place right of x, then the nearer of it and the one before
+        while (lo < hi)
+        {
+            int mid = (lo + hi) >> 1;
+            if (X[mid] - baseX < x) lo = mid + 1;
+            else hi = mid;
+        }
+        for (int k = Math.Max(s, lo - 3); k <= Math.Min(e, lo + 3); k++)
+        {
+            if (!graphemes[k]) continue;
+            double d = Math.Abs(X[k] - baseX - x);
+            if (d < bestD)
+            {
+                bestD = d;
+                best = k;
+            }
+        }
+        if (best == e && e > s && LineBreaks.IsSpace(Text[e - 1]) && e < Text.Length && Text[e] != '\n') best = LineBreaks.VisibleEnd(Text, s, e); // not past a line's hanging spaces
+        return best;
+    }
+
+    /// The text from `from` to `to` as copied: hard breaks as line breaks, code's padding as the space it was, a picture
+    /// as nothing, an autolink taken whole as its whole address.
+    public string Copy(int from, int to)
+    {
+        var sb = new StringBuilder(to - from + 8);
+        for (int i = from; i < to; i++)
+        {
+            bool whole = false;
+            foreach (var (s, e, c) in CopyAs)
+                if (s == i && e <= to)
+                {
+                    sb.Append(c);
+                    i = e - 1;
+                    whole = true;
+                    break;
+                }
+            if (whole) continue;
+            char ch = Text[i];
+            if (ch == '\n') sb.Append("\r\n");
+            else if (ch == LineBreaks.PadChar) sb.Append(' ');
+            else if (ch != LineBreaks.ObjectChar) sb.Append(ch);
+        }
+        return sb.ToString();
+    }
+
+    /// The word around `i` (a double-click): letters and digits (Korean to the spaces), or a run of spaces, or one mark.
+    public (int, int) WordAt(int i)
+    {
+        int n = Text.Length;
+        if (n == 0) return (0, 0);
+        i = Math.Clamp(i, 0, n - 1);
+        static bool Word(char c) => char.IsLetterOrDigit(c) || c == '_' || char.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.Surrogate;
+        char at = Text[i];
+        Func<char, bool> same = Word(at) ? Word : LineBreaks.IsSpace(at) ? LineBreaks.IsSpace : _ => false;
+        int s = i, e = i + 1;
+        while (s > 0 && same(Text[s - 1])) s--;
+        while (e < n && same(Text[e])) e++;
+        return (s, e);
+    }
+
+    /// The line from `s` to `e` as TextFormatter lays it out on its own (tests: against the shaped x).
+    internal double FormattedWidth(MdEnv env, int s, int e)
+    {
+        using var line = env.Formatter.FormatLine(new Source(this) { End = e }, s, 1e6, new MdParaProps(LookAt(s), 0), null);
+        return line.WidthIncludingTrailingWhitespace;
+    }
+
+    /// Line `k` (from `s` to `e`) drawn with its top at `y`: inline code's tint under it, its pictures, then the text.
+    public void DrawLine(DrawingContext dc, MdEnv env, int s, int e, double x, double y, double lineHeight, double height)
+    {
+        var source = new Source(this) { End = e };
+        double dy = height - lineHeight; // a picture made the line taller: the text sits at its bottom
+        using var line = env.Formatter.FormatLine(source, s, 1e6, new MdParaProps(LookAt(s), lineHeight), null);
+        double baseX = X[s];
+        if (codeTint)
+            foreach (var (cs, ce) in Code)
+            {
+                if (ce <= s || cs >= e || Text[cs] != LineBreaks.PadChar) continue; // an address: no tint
+                var look = LookAt(Math.Min(ce - 1, Math.Max(cs, s)));
+                var fam = look.Typeface.FontFamily;
+                double size = look.FontRenderingEmSize;
+                double top = y + dy + line.Baseline - fam.Baseline * size;
+                double x1 = X[Math.Max(cs, s)] - baseX, x2 = X[Math.Min(ce, e)] - baseX;
+                dc.DrawRectangle(Theme.P.Code, null, new Rect(x + x1, top, Math.Max(0, x2 - x1), fam.LineSpacing * size));
+            }
+        foreach (var (at, p) in Pictures)
+        {
+            if (at < s || at >= e || p.Bitmap is not { } bmp) continue;
+            dc.DrawImage(bmp.Source, new Rect(x + X[at] - baseX, y + height - p.Height, p.Width, p.Height));
+        }
+        line.Draw(dc, new Point(x, y + dy), InvertAxes.None);
+    }
+}

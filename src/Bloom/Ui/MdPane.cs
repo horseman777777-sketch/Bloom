@@ -83,7 +83,7 @@ internal sealed class MdPane : Grid, IComposerHost
             if (!quiet) Edited?.Invoke(editor.Text);
         };
         Children.Add(editor);
-        view = new MdView { Visibility = Visibility.Collapsed };
+        view = new MdView { Visibility = Visibility.Collapsed, OpenLink = url => OpenLink(url), Toggle = readOnly ? null : Toggle };
         Children.Add(view);
 
         // "글자 크기 16" for a moment, low in the middle
@@ -222,7 +222,7 @@ internal sealed class MdPane : Grid, IComposerHost
         var place = view.Place();
         rendered = editor.Text;
         renderedSize = TextSize;
-        view.Show(Markdown.BlocksOf(rendered, url => OpenLink(url), renderedSize, new MarkdownExtras { Toggle = readOnly ? null : Toggle, BaseDir = baseDir, Document = document }), renderedSize);
+        view.Show(rendered, renderedSize, document, baseDir);
         if (at is { } share) Restore(share);
         else Dispatcher.BeginInvoke(() => view.GoTo(place), DispatcherPriority.Loaded);
     }
