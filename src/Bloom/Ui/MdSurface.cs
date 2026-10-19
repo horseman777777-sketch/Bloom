@@ -71,6 +71,9 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
     /// QA: the longest idle slice so far (ms).
     public double LongestSliceMs { get; private set; }
 
+    /// QA: how much of that slice the GC held.
+    public double LongestSliceGcMs { get; private set; }
+
     /// QA: from the last Show to the end of the layout that drew it (ms).
     public double ShowToDrawnMs { get; private set; }
 
@@ -349,6 +352,7 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
         sliceQueued = false;
         if (boxes.Count == 0 || column <= 0 || !IsVisible && PresentationSource.FromVisual(this) is null) return;
         sliceWatch.Restart();
+        var gc0 = GC.GetTotalPauseDuration();
         int n = boxes.Count, looked = 0;
         bool changed = false;
         // a screen above and below first (scrolling there finds them ready), then the rest
@@ -363,7 +367,11 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
             if (scan >= n) scan = 0;
             if (Ready(k)) changed = true;
         }
-        LongestSliceMs = Math.Max(LongestSliceMs, sliceWatch.Elapsed.TotalMilliseconds);
+        if (sliceWatch.Elapsed.TotalMilliseconds > LongestSliceMs)
+        {
+            LongestSliceMs = sliceWatch.Elapsed.TotalMilliseconds;
+            LongestSliceGcMs = (GC.GetTotalPauseDuration() - gc0).TotalMilliseconds;
+        }
         if (changed)
         {
             Relayout();

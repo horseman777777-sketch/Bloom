@@ -29,8 +29,8 @@ internal static class MdBench
 
     private sealed class Round
     {
-        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs, SliceMaxMs, SizeDrawnMs, OutsideDrawnMs, JumpMax, ScrollGapMs, ResizeGapMs, CloseGapMs, GcPauseMs;
-        public int ScrollSteps, Stalls50, Stalls100, Gen2;
+        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs, SliceMaxMs, SliceGcMs, SizeDrawnMs, OutsideDrawnMs, JumpMax, ScrollGapMs, ResizeGapMs, CloseGapMs, GcPauseMs, ScrollBusyMs, ResizeBusyMs, MaxBusyMs;
+        public int ScrollSteps, Stalls50, Stalls100, Gen2, Busy50, Busy100;
         public bool SweptAll;
     }
 
@@ -101,8 +101,14 @@ internal static class MdBench
                 Line(text, "gen2 collections after open", results, x => x.Gen2);
                 Line(text, "longest UI gap overall ms", results, x => x.MaxGapMs);
                 Line(text, "longest idle layout slice ms", results, x => x.SliceMaxMs);
+                Line(text, "  of it GC pause ms", results, x => x.SliceGcMs);
                 Line(text, "stalls ≥ 50 ms (count)", results, x => x.Stalls50);
                 Line(text, "stalls ≥ 100 ms (count)", results, x => x.Stalls100);
+                Line(text, "busy probe (Send): scroll + jumps longest ms", results, x => x.ScrollBusyMs);
+                Line(text, "busy probe (Send): resize longest ms", results, x => x.ResizeBusyMs);
+                Line(text, "busy probe (Send): longest overall ms", results, x => x.MaxBusyMs);
+                Line(text, "busy probe (Send): ≥ 50 ms (count)", results, x => x.Busy50);
+                Line(text, "busy probe (Send): ≥ 100 ms (count)", results, x => x.Busy100);
                 text.AppendLine($"  scroll steps per round: {string.Join(", ", results.Select(x => x.ScrollSteps + (x.SweptAll ? "" : " (capped)")))}");
             }
         }
@@ -139,16 +145,20 @@ internal static class MdBench
 
     /// The stall probe (as Core\StallWatch.cs): a thread of its own asks the UI thread for an Input-priority moment every
     /// 10 ms and notes how long each took to come (UI work in between holds it back).
+    /// With Send priority it asks for the very next moment instead: how long the UI thread stays in one piece of work,
+    /// whatever else is queued (the Input probe also waits behind a stream of render work the sweep keeps queuing).
     private sealed class Probe
     {
-        private readonly Stopwatch watch = Stopwatch.StartNew();
+        private static readonly Stopwatch watch = Stopwatch.StartNew(); // one clock for both probes' marks
         private readonly Dispatcher ui = Dispatcher.CurrentDispatcher;
+        private readonly DispatcherPriority priority;
         private readonly System.Threading.Thread thread;
         private volatile bool stop;
         private readonly List<(double at, double ms)> answers = [];
 
-        public Probe()
+        public Probe(DispatcherPriority priority = DispatcherPriority.Input)
         {
+            this.priority = priority;
             thread = new System.Threading.Thread(Run) { IsBackground = true, Name = "md bench probe", Priority = System.Threading.ThreadPriority.AboveNormal };
             thread.Start();
         }
@@ -159,7 +169,7 @@ internal static class MdBench
             while (!stop)
             {
                 double sent = watch.Elapsed.TotalMilliseconds;
-                ui.BeginInvoke(DispatcherPriority.Input, () =>
+                ui.BeginInvoke(priority, () =>
                 {
                     double now = watch.Elapsed.TotalMilliseconds;
                     lock (answers) answers.Add((now, now - sent));
@@ -214,6 +224,7 @@ internal static class MdBench
     {
         var r = new Round();
         var probe = new Probe();
+        var busy = new Probe(DispatcherPriority.Send);
         var watch = Stopwatch.StartNew();
         await Idle();
         double mark = probe.Mark();
@@ -266,6 +277,7 @@ internal static class MdBench
         }
         await Idle();
         r.ScrollGapMs = probe.Longest(mark);
+        r.ScrollBusyMs = busy.Longest(mark);
 
         // resize: 600 → 1400 px wide, 20 px a frame
         mark = probe.Mark();
@@ -283,6 +295,7 @@ internal static class MdBench
         d.Width = 900;
         await Idle();
         r.ResizeGapMs = probe.Longest(mark);
+        r.ResizeBusyMs = busy.Longest(mark);
 
         // text size: one step up (MdPane redraws 120 ms after the last step)
         mark = probe.Mark();
@@ -320,6 +333,7 @@ internal static class MdBench
         r.OutsideDrawnMs = view.Surface.ShowToDrawnMs;
         await Task.Delay(300);
         r.SliceMaxMs = view.Surface.LongestSliceMs;
+        r.SliceGcMs = view.Surface.LongestSliceGcMs;
 
         mark = probe.Mark();
         d.Close();
@@ -329,10 +343,15 @@ internal static class MdBench
         r.GcPauseMs = GC.GetTotalPauseDuration().TotalMilliseconds - gc0;
         r.Gen2 = GC.CollectionCount(2) - gen2;
         probe.Stop();
+        busy.Stop();
         var gaps = probe.Gaps;
         r.MaxGapMs = gaps.DefaultIfEmpty(0).Max();
         r.Stalls50 = gaps.Count(g => g >= StallMs);
         r.Stalls100 = gaps.Count(g => g >= 100);
+        var held = busy.Gaps;
+        r.MaxBusyMs = held.DefaultIfEmpty(0).Max();
+        r.Busy50 = held.Count(g => g >= StallMs);
+        r.Busy100 = held.Count(g => g >= 100);
         return r;
     }
 
