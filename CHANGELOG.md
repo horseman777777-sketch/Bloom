@@ -2,6 +2,26 @@
 
 Each release on GitHub shows its section from this file (the workflow looks for `## <version>`).
 
+## 0.15.2
+
+- Markdown documents and notes no longer stall, even with many tables: Bloom now lays out and draws the text itself, only what is on the screen. On the test PC a 22 KB document with 24 tables opens in 0.05 s instead of 0.7 s, and scrolling, resizing the window and changing the text size no longer pause (the longest pause fell from 4.7 s to 0.05 s). Shift+arrow selection now carries on across paragraphs, and a shortened link copies as its whole address.
+- Glass transparency is a slider (Settings › Performance › Display, 15–75 %); the windows change as it moves.
+- The "update downloaded" card has "Restart to update", which puts the update in right away (#2).
+- Win key over admin apps (Settings › General, shown on administrator accounts): with an app run as administrator in front, a lone Win press now opens Bloom instead of the Start menu. Turning it on asks for admin approval once and installs a small helper, "Bloom Win-key helper", in Program Files that watches only the Win key and only while Bloom runs. Turning it off or uninstalling Bloom removes it (with admin approval); Windows Settings › Apps can remove it too. Reported by @nuv47 (#3).
+- Fixed: in 0.15.1, turning on Win key over admin apps said the helper couldn't be installed; Windows refused to start it before asking for approval.
+- Security: in custom commands, what `{input}` and `{clipboard}` put into a script is always taken as text and never run as a command, whatever quotes the script puts around it; the winget "install in a terminal" line quotes the package's Id and source too. Thanks to @horseman777777-sketch (#5).
+- Fixed: Bloom Lens and the color picker covered only part of a monitor whose scale differs from the main one (a 100 % monitor beside a 150 % one). Thanks to @horseman777777-sketch (#4).
+
+### 한국어
+
+- 표가 많은 마크다운 문서와 메모도 멈추지 않습니다. 이제 Bloom이 글자 배치를 직접 계산해 화면에 보이는 부분만 그립니다. 시험 PC에서 표 24개가 든 22KB 문서가 0.7초 대신 0.05초 만에 열리고, 스크롤·창 크기·글자 크기를 바꿀 때도 멈추지 않습니다(가장 긴 멈춤 4.7초 → 0.05초). Shift+화살표 선택이 문단을 넘어 이어지고, 줄여 표시한 링크는 전체 주소로 복사됩니다.
+- 유리 투명도를 슬라이더로 정합니다(설정 › 성능 › 화면, 15~75%). 움직이는 동안 창에 바로 반영됩니다.
+- '다운로드 완료' 업데이트 카드에 '다시 시작해서 업데이트' 버튼이 생겼습니다. 누르면 바로 업데이트를 적용합니다(#2).
+- 관리자 앱 위에서도 Win 키 사용(설정 › 일반, 관리자 계정에서만 표시): 관리자 권한으로 실행한 앱이 앞에 있어도 Win 키 한 번으로 시작 메뉴 대신 Bloom이 열립니다. 켤 때 관리자 승인을 한 번 받고, Bloom이 실행 중일 때 Win 키만 살피는 작은 도우미 'Bloom Win-key helper'를 Program Files에 설치합니다. 끄거나 Bloom을 삭제하면 지우며(관리자 승인 필요), Windows 설정 › 앱에서도 지울 수 있습니다. @nuv47 님 제보(#3).
+- 수정: 0.15.1에서 '관리자 앱 위에서도 Win 키 사용'을 켜면 '도우미를 설치하지 못했습니다'가 뜨던 문제를 고쳤습니다. Windows가 승인 창을 띄우기 전에 도우미 실행을 막고 있었습니다.
+- 보안: 사용자 명령에서 `{input}`과 `{clipboard}`로 스크립트에 들어가는 값은 스크립트가 어떤 따옴표를 두르든 항상 글자로만 다루고 명령으로 실행하지 않습니다. winget '터미널에서 설치' 줄의 패키지 Id와 소스도 따옴표로 감쌉니다. @horseman777777-sketch 님 감사합니다(#5).
+- 수정: 배율이 주 모니터와 다른 모니터에서 Bloom Lens와 색 고르기가 화면 일부만 덮던 문제(150% 옆의 100% 모니터 등)를 고쳤습니다. @horseman777777-sketch 님 감사합니다(#4).
+
 ## 0.15.1
 
 - Markdown documents and notes no longer stall, even with many tables: Bloom now lays out and draws the text itself, only what is on the screen. On the test PC a 22 KB document with 24 tables opens in 0.05 s instead of 0.7 s, and scrolling, resizing the window and changing the text size no longer pause (the longest pause fell from 4.7 s to 0.05 s). Shift+arrow selection now carries on across paragraphs, and a shortened link copies as its whole address.

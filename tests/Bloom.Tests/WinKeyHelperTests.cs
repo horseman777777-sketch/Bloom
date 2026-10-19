@@ -19,6 +19,25 @@ internal static class WinKeyHelperTests
             Check.Eq(WinKeyProtocol.ParsePid(bad), null, $"«{bad}» refused");
     }
 
+    /// Both exes' manifests are XML: Windows reads one before it starts the exe and refuses a broken one with 14001
+    /// ("side-by-side configuration is incorrect"), before any UAC prompt. 0.15.1's helper had "--" inside a comment.
+    public static void ManifestsAreXml()
+    {
+        foreach (string name in new[] { "Bloom", "WinKeyHelper" })
+        {
+            string? error = null;
+            try
+            {
+                XDocument.Load(System.IO.Path.Combine(AppContext.BaseDirectory, "Manifests", name + ".manifest"));
+            }
+            catch (System.Xml.XmlException e)
+            {
+                error = e.Message;
+            }
+            Check.Eq(error, null, $"{name}'s manifest is XML");
+        }
+    }
+
     /// The hand-made Task Scheduler vtable calls a normal user can make (connect, find the \Bloom folder and this
     /// user's task in it) run against the real service without a COM error; nothing is registered.
     public static void TaskSchedulerAnswers()

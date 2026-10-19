@@ -4,8 +4,9 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- every use is elevated: the task (highest available), --install / --remove (Bloom's UAC prompt, or
-             Windows' Apps list for the uninstall entry) -->
+        <!-- every use is elevated: the task (highest available), the install and remove switches (Bloom's UAC
+             prompt, or Windows' Apps list for the uninstall entry). No double hyphen in an XML comment: Windows then
+             refuses to start the exe (14001). -->
         <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
       </requestedPrivileges>
     </security>
