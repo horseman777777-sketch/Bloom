@@ -19,14 +19,6 @@ internal interface IComposerHost
     void ShowToast(string text);
 }
 
-/// A view made of many ReadTexts whose selection can run over several of them (MdView): copying and 모두 선택 are its.
-internal interface ISelectionOwner
-{
-    void CopySelection();
-
-    void SelectEverything();
-}
-
 /// Text in a conversation that can be dragged over and copied (Ctrl+C or the right button), across paragraphs, lists
 /// and tables: a read-only RichTextBox with no frame, caret or scrolling of its own. Copying gives plain text without
 /// the joiners Hangul.KeepAll puts between Korean letters. The wheel scrolls the conversation, not this; any key but a
@@ -116,11 +108,6 @@ internal sealed class ReadText : RichTextBox
 
     private void CopyNow()
     {
-        if (Above<ISelectionOwner>(this) is { } owner)
-        {
-            owner.CopySelection();
-            return;
-        }
         if (CopyOut(this, SelectedText)) Back();
     }
 
@@ -169,21 +156,22 @@ internal sealed class ReadText : RichTextBox
     protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)
     {
         e.Handled = true;
+        CopyMenu(ref menu, CopyNow, SelectAllNow);
+    }
+
+    /// The right button's menu over text that can be selected (a ReadText, MdView): 복사 and 모두 선택.
+    public static void CopyMenu(ref PopupMenu? menu, Action copy, Action selectAll)
+    {
         menu ??= new PopupMenu();
         menu.Open(new[]
         {
-            new ActionItem { Title = Tr("복사", "Copy"), Keys = "Ctrl+C", Glyph = G.Copy, Run = CopyNow },
-            new ActionItem { Title = Tr("모두 선택", "Select all"), Keys = "Ctrl+A", Glyph = G.Page, Run = SelectAllNow },
+            new ActionItem { Title = Tr("복사", "Copy"), Keys = "Ctrl+C", Glyph = G.Copy, Run = copy },
+            new ActionItem { Title = Tr("모두 선택", "Select all"), Keys = "Ctrl+A", Glyph = G.Page, Run = selectAll },
         });
     }
 
     private void SelectAllNow()
     {
-        if (Above<ISelectionOwner>(this) is { } owner)
-        {
-            owner.SelectEverything();
-            return;
-        }
         Focus();
         SelectAll();
     }

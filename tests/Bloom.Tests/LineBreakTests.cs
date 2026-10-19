@@ -54,7 +54,7 @@ internal static class LineBreakTests
         var env = Env();
         var code = Shaped(env, T("see "), T("Contoso.WeatherService.Runtime", MdStyle.Code));
         string text = code.Text;
-        Check.True(text[4] == LineBreaks.PadChar && text[^1] == LineBreaks.PadChar, "code with its padding as one character each side");
+        Check.True(text[4] == Hangul.CodePad && text[^1] == Hangul.CodePad, "code with its padding as one character each side");
         var inCode = code.Opportunities.Where(k => k > 5).ToArray();
         Check.Eq(string.Join(",", inCode.Select(k => text[k - 1])), ".,.", "in code: after the dots only");
         Check.True(!code.Opportunities.Contains(5) && code.Opportunities.Contains(4), "the padding holds on to the code; the space before it breaks");

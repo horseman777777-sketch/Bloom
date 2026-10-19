@@ -16,9 +16,6 @@ internal static class LineBreaks
     /// A picture in the text (drawn, not shaped): a line may break on either side of it.
     public const char ObjectChar = '\uFFFC';
 
-    /// Inline code's padding in the text (drawn room, not shaped): it holds on to the code as a letter would.
-    public const char PadChar = '\u2007';
-
     // no line starts with these (closing marks, small kana, the long vowel mark, iteration marks) …
     private const string NoStart = ")]}>,.:;!?%、。，．：；？！）］｝〉》」』】〕〗〙〛’”ゝゞヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ々〻‐゠–〜～・…‥";
 

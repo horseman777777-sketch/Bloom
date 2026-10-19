@@ -21,7 +21,7 @@ internal sealed partial class MdSurface
     private Point pressAt;
     private bool dragging;
     private readonly DispatcherTimer edge = new() { Interval = TimeSpan.FromMilliseconds(30) };
-    private readonly DispatcherTimer copiedTimer = new() { Interval = TimeSpan.FromMilliseconds(1300) };
+    private readonly DispatcherTimer copiedTimer = new() { Interval = MdMetrics.CopiedFor };
     private MdBox? copiedBox;
 
     /// The selection's ends in order, or null (nothing, or an empty one).
@@ -167,9 +167,9 @@ internal sealed partial class MdSurface
                     dc.DrawRectangle(Theme.P.AccentText, null, new Rect(x + r.X, y + r.Y, r.Width, r.Height));
             else if (hover is MdSpot spot && b.Spots.Contains(spot) && spot.Owner.Block.Kind == MdKind.Item && spot.Owner.Block.Done == false && Toggle is not null)
             {
-                double radius = Math.Round(env.M.BoxSide * 0.3);
-                var box = spot.Inner;
-                dc.DrawRoundedRectangle(null, new Pen(Theme.P.Accent, 1.5), new Rect(x + env.Snap(box.X) + 0.75, y + env.Snap(box.Y) + 0.75, box.Width - 1.5, box.Height - 1.5), radius, radius);
+                dc.PushTransform(new TranslateTransform(x, y));
+                MdBox.BoxShape(dc, env, spot.Inner, null, Theme.P.Accent);
+                dc.Pop();
             }
         }
     }

@@ -116,15 +116,15 @@ internal static class Markdown
         {
             Width = s,
             Height = s,
-            CornerRadius = new CornerRadius(Math.Round(s * 0.3)),
-            BorderThickness = new Thickness(1.5),
+            CornerRadius = new CornerRadius(ctx.M.BoxRadius),
+            BorderThickness = new Thickness(MdMetrics.BoxStroke),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
             Background = done ? Theme.P.Accent : Brushes.Transparent,
             BorderBrush = done ? Theme.P.Accent : Theme.P.TextFaint,
         };
         // over the box rather than in it: the glyph's line is taller than the box and would be cut off there
-        var tick = Theme.Glyph(Search.G.Check, Math.Round(size * 0.75), Theme.P.AccentInk);
+        var tick = Theme.Glyph(Search.G.Check, ctx.M.TickSize, Theme.P.AccentInk);
         tick.Width = s;
         tick.LineHeight = double.NaN; // not the paragraph's, which it would take through the document
         tick.TextAlignment = TextAlignment.Center;
@@ -157,7 +157,7 @@ internal static class Markdown
         var grid = new Grid();
         var holder = new Border
         {
-            Margin = new Thickness(0, lang.Length > 0 ? 18 : 0, 0, 0),
+            Margin = new Thickness(0, lang.Length > 0 ? MdMetrics.LabelGap : 0, 0, 0),
             Background = Brushes.Transparent, // the mouse finds it between the lines too
             Child = new TextBlock { Text = code, FontFamily = Theme.Mono, FontSize = size, Foreground = Theme.P.Text, TextWrapping = TextWrapping.Wrap, LineHeight = lineHeight },
         };
@@ -171,28 +171,28 @@ internal static class Markdown
         grid.Children.Add(holder);
         if (lang.Length > 0)
         {
-            var l = Theme.T(lang, 11, Theme.P.TextFaint, Theme.Medium);
+            var l = Theme.T(lang, MdMetrics.LabelSize, Theme.P.TextFaint, Theme.Medium);
             l.VerticalAlignment = VerticalAlignment.Top;
             l.HorizontalAlignment = HorizontalAlignment.Left;
             grid.Children.Add(l);
         }
-        var copyText = Theme.T(Tr("복사", "Copy"), 11, Theme.P.TextDim, Theme.Medium, false);
+        var copyText = Theme.T(Tr("복사", "Copy"), MdMetrics.LabelSize, Theme.P.TextDim, Theme.Medium, false);
         var copy = new SmoothBorder
         {
             Child = copyText,
-            Padding = new Thickness(7, 1, 7, 2),
-            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(MdMetrics.CopyPadX, MdMetrics.CopyPadTop, MdMetrics.CopyPadX, MdMetrics.CopyPadBottom),
+            CornerRadius = new CornerRadius(MdMetrics.CopyRadius),
             Background = Theme.P.Key,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
             Cursor = Cursors.Hand,
-            Margin = new Thickness(0, -2, -4, 0),
+            Margin = new Thickness(0, -MdMetrics.CopyOutTop, -MdMetrics.CopyOutRight, 0),
         };
         copy.MouseLeftButtonUp += (_, e) =>
         {
             Search.Launch.Copy(code);
             copyText.Text = Tr("복사 완료", "Copied");
-            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1300) };
+            var t = new DispatcherTimer { Interval = MdMetrics.CopiedFor };
             t.Tick += (_, _) =>
             {
                 t.Stop();
@@ -205,8 +205,8 @@ internal static class Markdown
         return new SmoothBorder
         {
             Background = Theme.P.Code,
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(12, 9, 12, 10),
+            CornerRadius = new CornerRadius(MdMetrics.CodeRadius),
+            Padding = new Thickness(MdMetrics.CodeLeft, MdMetrics.CodeTop, MdMetrics.CodeRight, MdMetrics.CodeBottom),
             Child = grid,
         };
     }

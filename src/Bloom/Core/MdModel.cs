@@ -400,6 +400,13 @@ internal readonly record struct MdMetrics(double Size, bool Document)
 
     public double BoxColumn => BoxSide + Math.Round(Size * 0.55);
 
+    /// A checklist box's corners and its line, and its tick's size.
+    public double BoxRadius => Math.Round(BoxSide * 0.3);
+
+    public const double BoxStroke = 1.5;
+
+    public double TickSize => Math.Round(Size * 0.75);
+
     /// A list item's indent per level (up to 4).
     public double IndentOf(int level) => Math.Min(level, 4) * Scaled(18);
 
@@ -413,6 +420,12 @@ internal readonly record struct MdMetrics(double Size, bool Document)
     public double CodeLine => Math.Round(Scaled(19));
 
     public const double CodeLeft = 12, CodeTop = 9, CodeRight = 12, CodeBottom = 10, CodeRadius = 8, LabelSize = 11, LabelGap = 18;
+
+    /// Code's 복사 button: its label at LabelSize with 7 / 1 / 7 / 2 round it, round 5, out past the code's inside 4
+    /// right and 2 up; 복사 완료 shows on it for CopiedFor.
+    public const double CopyPadX = 7, CopyPadTop = 1, CopyPadBottom = 2, CopyRadius = 5, CopyOutRight = 4, CopyOutTop = 2;
+
+    public static readonly TimeSpan CopiedFor = TimeSpan.FromMilliseconds(1300);
 
     /// A table's text: a size smaller, lines 1.5 × that, cells 8 / 6 inside, a 1 px line under each.
     public double CellSize => Size - 1;

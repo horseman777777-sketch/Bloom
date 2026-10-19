@@ -105,8 +105,9 @@ internal static class Hangul
         return sb?.ToString() ?? s;
     }
 
-    /// What Ui\Markdown.cs draws inline code with: its padding, a space no line break comes off (FIGURE SPACE), and after
-    /// . / \ _ - in it a chance to break a long one there (ZERO WIDTH SPACE). Display only, as KeepAll's joiners.
+    /// What Ui\Markdown.cs draws inline code with: its padding, a space no line break comes off (FIGURE SPACE; the
+    /// Markdown view's MdText holds it as drawn room, not shaped), and after . / \ _ - in it a chance to break a long one
+    /// there (ZERO WIDTH SPACE). Display only, as KeepAll's joiners.
     public const char CodePad = '\u2007', BreakHint = '\u200B';
 
     /// The display-only characters undone: shown text back to what was written (a selection copied from the screen) —

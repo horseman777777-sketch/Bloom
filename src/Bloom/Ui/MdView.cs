@@ -10,7 +10,7 @@ namespace Bloom.Ui;
 /// A long file opens at once (only what is near the screen is shaped first, the rest while the UI thread is idle) and
 /// follows a new width by arithmetic. A drag selects over blocks and table cells, scrolling on past the top or bottom;
 /// Ctrl+C and the menu's 복사 copy it, Ctrl+A selects everything; Shift+arrows move the selection's end.
-internal sealed class MdView : ScrollViewer, ISelectionOwner
+internal sealed class MdView : ScrollViewer
 {
     private readonly MdSurface surface = new();
     private PopupMenu? menu;
@@ -74,12 +74,7 @@ internal sealed class MdView : ScrollViewer, ISelectionOwner
     {
         base.OnMouseRightButtonUp(e);
         e.Handled = true;
-        menu ??= new PopupMenu();
-        menu.Open(new[]
-        {
-            new ActionItem { Title = Tr("복사", "Copy"), Keys = "Ctrl+C", Glyph = G.Copy, Run = CopySelection },
-            new ActionItem { Title = Tr("모두 선택", "Select all"), Keys = "Ctrl+A", Glyph = G.Page, Run = SelectEverything },
-        });
+        ReadText.CopyMenu(ref menu, CopySelection, SelectEverything);
     }
 
     // Windows' own menu would come up otherwise

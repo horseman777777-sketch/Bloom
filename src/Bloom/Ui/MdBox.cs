@@ -351,20 +351,25 @@ internal sealed class MdBox
         double s = m.BoxSide, mid = baseline - (2 * Theme.Sans.Baseline - Theme.Sans.LineSpacing) * m.Size / 2;
         var box = new Rect(indent, mid - s / 2, s, s);
         bool done = b.Done == true;
-        double glyph = Math.Round(m.Size * 0.75);
-        var tickLook = env.Props(Theme.IconFont, FontWeights.Normal, FontStyles.Normal, glyph, Theme.P.AccentInk);
+        var tickLook = env.Props(Theme.IconFont, FontWeights.Normal, FontStyles.Normal, m.TickSize, Theme.P.AccentInk);
         var tick = done ? MdText.Plain(Search.G.Check.ToString(), tickLook) : null;
         tick?.Shape(env);
         front.Add(new MdDeco(box, (dc, r) =>
         {
-            var square = new Rect(env.Snap(r.X) + 0.75, env.Snap(r.Y) + 0.75, r.Width - 1.5, r.Height - 1.5);
-            double radius = Math.Round(s * 0.3);
-            dc.DrawRoundedRectangle(done ? Theme.P.Accent : null, new Pen(done ? Theme.P.Accent : Theme.P.TextFaint, 1.5), square, radius, radius);
+            BoxShape(dc, env, r, done ? Theme.P.Accent : null, done ? Theme.P.Accent : Theme.P.TextFaint);
             if (tick is null) return;
             var (tb, th) = env.LineOf(tickLook, 0);
             tick.DrawLine(dc, env, 0, tick.Text.Length, r.X + (r.Width - tick.Widest) / 2, env.Snap(r.Y + (r.Height - th) / 2), 0, th);
         }));
         Spots.Add(new MdSpot(new Rect(indent, 0, column, first), this, box));
+    }
+
+    /// A checklist box's square in `box` (MdMetrics: its corners and line, inside its edge): filled, ringed.
+    public static void BoxShape(DrawingContext dc, MdEnv env, Rect box, Brush? fill, Brush ring)
+    {
+        double half = MdMetrics.BoxStroke / 2, radius = env.M.BoxRadius;
+        var square = new Rect(env.Snap(box.X) + half, env.Snap(box.Y) + half, box.Width - MdMetrics.BoxStroke, box.Height - MdMetrics.BoxStroke);
+        dc.DrawRoundedRectangle(fill, new Pen(ring, MdMetrics.BoxStroke), square, radius, radius);
     }
 
     /// Fenced code: its tint (round 8), the language top left, 복사 top right, the code below.
@@ -385,13 +390,13 @@ internal sealed class MdBox
         if (copy is null || copied is null) return;
         var (_, bh) = env.LineOf(copy.LookAt(0), 0);
         var shown = Copied ? copied : copy;
-        double w = shown.Widest + 14, h = bh + 3; // 7 / 1 / 7 / 2 inside
-        var button = new Rect(width - MdMetrics.CodeRight + 4 - w, MdMetrics.CodeTop - 2, w, h);
+        double w = shown.Widest + 2 * MdMetrics.CopyPadX, h = bh + MdMetrics.CopyPadTop + MdMetrics.CopyPadBottom;
+        var button = new Rect(width - MdMetrics.CodeRight + MdMetrics.CopyOutRight - w, MdMetrics.CodeTop - MdMetrics.CopyOutTop, w, h);
         front.Add(new MdDeco(button, (dc, r) =>
         {
             var at = new Rect(env.Snap(r.X), env.Snap(r.Y), r.Width, r.Height);
-            dc.DrawRoundedRectangle(Theme.P.Key, null, at, 5, 5);
-            shown.DrawLine(dc, env, 0, shown.Text.Length, at.X + 7, at.Y + 1, 0, bh);
+            dc.DrawRoundedRectangle(Theme.P.Key, null, at, MdMetrics.CopyRadius, MdMetrics.CopyRadius);
+            shown.DrawLine(dc, env, 0, shown.Text.Length, at.X + MdMetrics.CopyPadX, at.Y + MdMetrics.CopyPadTop, 0, bh);
         }));
         Spots.Add(new MdSpot(button, this, button));
     }

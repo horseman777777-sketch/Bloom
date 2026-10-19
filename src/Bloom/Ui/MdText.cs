@@ -155,7 +155,7 @@ internal sealed class MdEnv
 /// One text of the view (a paragraph's, a heading's, a list item's, a table cell's, a code block's, a label's) in its
 /// looks, shaped once on one unbroken line per segment (between hard breaks: '\n') — each character's x — and broken
 /// into lines at any width by arithmetic (LineBreaks). Pictures, inline code's padding and tabs are in the text as one
-/// character each (LineBreaks.ObjectChar, PadChar, '\t') and drawn, not shaped. Very long segments are shaped in pieces
+/// character each (LineBreaks.ObjectChar, Hangul.CodePad, '\t') and drawn, not shaped. Very long segments are shaped in pieces
 /// of about 4,000 characters cut where a line may break.
 internal sealed class MdText
 {
@@ -278,9 +278,9 @@ internal sealed class MdText
                 ? env.Props(Theme.Mono, w, st, env.M.CodeSize, s.Link is null ? brush : Theme.P.AccentText, strike)
                 : env.Props(Theme.Sans, w, st, size, s.Link is null ? brush : Theme.P.AccentText, strike);
             Look(look);
-            if (isCode) sb.Append(LineBreaks.PadChar);
+            if (isCode) sb.Append(Hangul.CodePad);
             sb.Append(s.Text);
-            if (isCode) sb.Append(LineBreaks.PadChar);
+            if (isCode) sb.Append(Hangul.CodePad);
             if (isCode) code.Add((at, sb.Length));
             else if (s.Link is not null && (s.Copy is not null || s.Text == s.Link.Url)) code.Add((at, sb.Length)); // an address breaks as code
             if (s.Link is not null)
@@ -338,7 +338,7 @@ internal sealed class MdText
     {
         var at = new List<int>();
         for (int i = 0; i < Text.Length; i++)
-            if (Text[i] is LineBreaks.ObjectChar or LineBreaks.PadChar or '\t') at.Add(i);
+            if (Text[i] is LineBreaks.ObjectChar or Hangul.CodePad or '\t') at.Add(i);
         objectsAt = [.. at];
         objects = new MdObject?[at.Count];
         for (int k = 0; k < at.Count; k++)
@@ -347,7 +347,7 @@ internal sealed class MdText
             var look = LookAt(i);
             double w = Text[i] switch
             {
-                LineBreaks.PadChar => env.Pad,
+                Hangul.CodePad => env.Pad,
                 '\t' => env.Tab(look),
                 _ => PictureAt(i) is { } p ? p.Width : 0,
             };
@@ -642,7 +642,7 @@ internal sealed class MdText
             if (whole) continue;
             char ch = Text[i];
             if (ch == '\n') sb.Append("\r\n");
-            else if (ch == LineBreaks.PadChar) sb.Append(' ');
+            else if (ch == Hangul.CodePad) sb.Append(' ');
             else if (ch != LineBreaks.ObjectChar) sb.Append(ch);
         }
         return sb.ToString();
@@ -710,7 +710,7 @@ internal sealed class MdText
         if (codeTint)
             foreach (var (cs, ce) in Code)
             {
-                if (ce <= s || cs >= e || Text[cs] != LineBreaks.PadChar) continue; // an address: no tint
+                if (ce <= s || cs >= e || Text[cs] != Hangul.CodePad) continue; // an address: no tint
                 var at = LookAt(Math.Min(ce - 1, Math.Max(cs, s)));
                 var fam = at.Typeface.FontFamily;
                 double size = at.FontRenderingEmSize;
