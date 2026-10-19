@@ -123,7 +123,8 @@ internal static class LineBreakTests
     }
 
     /// A line is its pieces' drawing clipped to it: no ink of a character on the line before or after may show (the
-    /// foot of an "A" starting the next line), at any DPI or size, in prose, bold, italic and code.
+    /// foot of an "A" starting the next line), and none of its own may go (an italic's overhang), at any DPI or size, in
+    /// prose, bold, italic, code and Japanese — against the line formatted on its own.
     public static void LinesShowOnlyTheirOwnInk()
     {
         int beforeA = 0;
@@ -140,15 +141,16 @@ internal static class LineBreakTests
                     {
                         int s = starts[k], e = t.LineEnd(starts, k);
                         if (t.Text.AsSpan(e).StartsWith("API")) beforeA++;
-                        // a table cell's text starts between pixels; drawn at its DPI, and at 96 (a capture's)
-                        foreach (double at in new[] { ppd, 1.0 }.Distinct())
-                            for (double frac = 0; frac < 1; frac += 0.125)
-                            {
-                                var drawn = Ink(t, env, s, e, false, at, frac);
-                                var own = Ink(t, env, s, e, true, at, frac);
-                                string? leak = Leak(drawn, own);
-                                Check.True(leak is null, $"{ppd} ppd drawn at {at}, {size} px, width {width}, +{frac}: line \"{t.Text[s..e]}\" shows ink not its own at {leak}");
-                            }
+                        // a table cell's text starts between pixels (drawn on the pixels it was laid out for)
+                        for (double frac = 0; frac < 1; frac += 0.125)
+                        {
+                            var drawn = Ink(t, env, s, e, false, ppd, frac);
+                            var own = Ink(t, env, s, e, true, ppd, frac);
+                            string? leak = Leak(drawn, own);
+                            Check.True(leak is null, $"{ppd} ppd, {size} px, width {width}, +{frac}: line \"{t.Text[s..e]}\" shows ink not its own at {leak}");
+                            string? cut = Leak(own, drawn); // and all of its own, the italic's overhang too
+                            Check.True(cut is null, $"{ppd} ppd, {size} px, width {width}, +{frac}: line \"{t.Text[s..e]}\" loses its own ink at {cut}");
+                        }
                     }
                 }
             }

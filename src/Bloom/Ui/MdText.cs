@@ -175,6 +175,7 @@ internal sealed class MdText
 
     public float[] X = [];
     public int[] Opportunities = [];
+    private float[] cuts = []; // per opportunity: the ink's right end before it, the ink's left end after it (InkAtCuts)
     private bool[]? graphemes;
     public bool Shaped;
 
@@ -184,6 +185,7 @@ internal sealed class MdText
     private Drawing?[]? drawings;
     private double[]? baselines;
     private double drawnAt = -1; // the line height the drawings are for
+    private Dictionary<(int, int, double), Drawing>? aloneDrawn; // lines formatted on their own (DrawLine)
 
     /// The widest segment (a table column's natural width adds these up).
     public double Widest;
@@ -387,6 +389,8 @@ internal sealed class MdText
     {
         Objects(env);
         Opportunities = LineBreaks.Opportunities(Text, Code);
+        cuts = new float[Opportunities.Length * 2];
+        Array.Fill(cuts, float.NaN);
         graphemes = null;
         pieces.Clear();
         Forget();
@@ -418,33 +422,103 @@ internal sealed class MdText
             Widest = Math.Max(Widest, x0);
             seg = segEnd + 1;
         }
-        Split();
+        Split(env.Ppd);
         Shaped = true;
     }
 
-    /// The pieces cut again to about DrawPiece characters each, where a line may break (else between clusters): a line
-    /// on screen draws only the few it lies in, not all of a long paragraph clipped.
-    private void Split()
+    /// The pieces cut again: at each place inside a word a line may break where the two sides' ink comes within 3 device
+    /// pixels (a "/" before a letter in code: no clip between them would hold, CutAt), so a line ending there ends a
+    /// piece; and to about DrawPiece characters each, where a line may break (else between clusters), so a line on screen
+    /// draws only the few it lies in, not all of a long paragraph clipped.
+    private void Split(double ppd)
     {
-        const int DrawPiece = 120;
         var shaped = pieces.ToArray();
         pieces.Clear();
         foreach (var (from, to) in shaped)
         {
-            int start = from;
-            while (to - start > DrawPiece * 3 / 2)
+            int j = Array.BinarySearch(Opportunities, from + 1);
+            if (j < 0) j = ~j;
+            for (int start = from; start < to;)
             {
-                int k = Array.BinarySearch(Opportunities, start + DrawPiece);
-                if (k < 0) k = ~k - 1;
-                int cut = k >= 0 && Opportunities[k] > start + DrawPiece / 2 ? Opportunities[k] : start + DrawPiece;
-                graphemes ??= LineBreaks.Graphemes(Text);
-                while (cut < to && !graphemes[cut]) cut++;
-                if (cut >= to) break;
-                pieces.Add((start, cut));
-                start = cut;
+                while (j < Opportunities.Length && Opportunities[j] < to && !Tight(j, ppd)) j++;
+                int end = j < Opportunities.Length && Opportunities[j] < to ? Opportunities[j++] : to;
+                BySize(start, end);
+                start = end;
             }
-            pieces.Add((start, to));
         }
+    }
+
+    private bool Tight(int j, double ppd)
+    {
+        int k = Opportunities[j];
+        float r = cuts[2 * j], l = cuts[2 * j + 1];
+        return !char.IsWhiteSpace(Text[k - 1]) && !float.IsNaN(r) && !float.IsNaN(l) && (l - r) * ppd < 3;
+    }
+
+    private void BySize(int start, int to)
+    {
+        const int DrawPiece = 120;
+        while (to - start > DrawPiece * 3 / 2)
+        {
+            int k = Array.BinarySearch(Opportunities, start + DrawPiece);
+            if (k < 0) k = ~k - 1;
+            int cut = k >= 0 && Opportunities[k] > start + DrawPiece / 2 ? Opportunities[k] : start + DrawPiece;
+            graphemes ??= LineBreaks.Graphemes(Text);
+            while (cut < to && !graphemes[cut]) cut++;
+            if (cut >= to) break;
+            pieces.Add((start, cut));
+            start = cut;
+        }
+        pieces.Add((start, to));
+    }
+
+    /// Where the ink ends before and starts after each place inside a word a line may break at (Chinese, Japanese,
+    /// code, dashes), from the glyphs' bearings in this run (`start` to `end`): DrawLine clips a piece between them.
+    /// Left unknown (NaN, the line is formatted alone) where one glyph spans the place (a ligature).
+    private void InkAtCuts(GlyphRun g, double[] gx, IList<ushort>? map, int start, int end)
+    {
+        var face = g.GlyphTypeface;
+        var ids = g.GlyphIndices;
+        double em = g.FontRenderingEmSize;
+        int count = ids.Count;
+        int i = Array.BinarySearch(Opportunities, start);
+        if (i < 0) i = ~i;
+        for (; i < Opportunities.Length && Opportunities[i] <= end; i++)
+        {
+            int k = Opportunities[i];
+            if (k > start && !char.IsWhiteSpace(Text[k - 1]))
+            {
+                // the cluster before k: its glyphs' right ink
+                int g0 = GlyphOf(map, k - 1 - start, count), g1 = k < end ? GlyphOf(map, k - start, count) : count;
+                if (g1 <= g0) continue;
+                double right = double.NegativeInfinity;
+                for (int j = g0; j < g1; j++) right = Math.Max(right, gx[j] + (face.AdvanceWidths[ids[j]] - face.RightSideBearings[ids[j]]) * em);
+                cuts[2 * i] = (float)right;
+            }
+            if (k < end)
+            {
+                // the cluster from k: its glyph's left ink, and its marks' (no advance of their own)
+                int j = GlyphOf(map, k - start, count);
+                double left = double.PositiveInfinity;
+                for (int m = j; m < count && (m == j || gx[m + 1] == gx[m]); m++) left = Math.Min(left, gx[m] + face.LeftSideBearings[ids[m]] * em);
+                if (j < count) cuts[2 * i + 1] = (float)left;
+            }
+        }
+    }
+
+    private static int GlyphOf(IList<ushort>? map, int c, int count) => map is null ? Math.Min(c, count) : map[c];
+
+    /// A clip edge for a line that starts (`keepAfter`) or ends at the break `k` inside a word: on a device pixel at
+    /// least a pixel clear of the ink on both sides (InkAtCuts; a glyph drawn in Display mode sits on its pixel), as near the other line's ink as that allows so the
+    /// line's own overhang shows; NaN where the two come closer (kerning, overhang). `shift` takes X to the drawing's x.
+    private double CutAt(int k, double shift, double ppd, bool keepAfter)
+    {
+        int i = Array.BinarySearch(Opportunities, k);
+        if (i < 0) return double.NaN; // a word longer than the line, broken between clusters
+        float r = cuts[2 * i], l = cuts[2 * i + 1];
+        if (float.IsNaN(r) || float.IsNaN(l)) return double.NaN;
+        double a = Math.Ceiling((r + shift) * ppd + 1), b = Math.Floor((l + shift) * ppd - 1);
+        return a > b ? double.NaN : (keepAfter ? a : b) / ppd;
     }
 
     /// One unbroken line from `from` to `to`: each character's x from its glyphs' advances (a cluster's characters share
@@ -475,6 +549,7 @@ internal sealed class MdText
                 gx[0] = x;
                 for (int k = 0; k < count; k++) gx[k + 1] = gx[k] + advances[k];
                 for (int c = 0; c < len && start + c < to; c++) X[start + c] = (float)gx[map is null ? Math.Min(c, count) : map[c]];
+                InkAtCuts(g, gx, map, start, Math.Min(start + len, to));
                 x = gx[count];
                 covered = Math.Max(covered, start + len);
             }
@@ -591,6 +666,7 @@ internal sealed class MdText
     {
         drawings = null;
         baselines = null;
+        aloneDrawn = null;
     }
 
     /// Piece `k` drawn once, on one line `lineHeight` high with its top at 0 and its first character at 0.
@@ -639,27 +715,40 @@ internal sealed class MdText
             dc.DrawImage(bmp.Source, new Rect(x + X[at] - baseX, y + height - p.Height, p.Width, p.Height));
         }
         // A piece holds only its own characters, so it is clipped only where it runs on past the line: halfway into the
-        // spaces where the lines part at spaces (the line's own last glyph may overhang into its half). Where they part
-        // inside a word (Chinese, Japanese, code, a word longer than the line) the two sides' ink may meet or overlap
-        // (kerning, overhang): the line is formatted on its own then, as `alone`.
+        // spaces where the lines part at spaces (the line's own last glyph may overhang into its half); where they part
+        // inside a word (Chinese, Japanese, code), between the two sides' ink (CutAt; where it comes closer a piece ends
+        // there, Split). Where no edge holds (a ligature, a word longer than the line) the line is formatted on its own,
+        // as `alone`.
         double left = double.NegativeInfinity, right = double.PositiveInfinity;
         int last = PieceAt(e - 1);
         if (!alone && s > pieces[first].From)
         {
             int p = LineBreaks.VisibleEnd(Text, pieces[first].From, s);
-            if (p < s) left = x + (X[p] + X[s]) / 2 - baseX;
-            else alone = true;
+            left = p < s ? x + (X[p] + X[s]) / 2 - baseX : CutAt(s, x - baseX, env.Ppd, keepAfter: true);
+            alone = double.IsNaN(left);
         }
         if (!alone && e < pieces[last].To)
         {
             int t = LineBreaks.VisibleEnd(Text, s, e);
-            if (t < e) right = x + (X[t] + X[e]) / 2 - baseX;
-            else alone = true;
+            right = t < e ? x + (X[t] + X[e]) / 2 - baseX : CutAt(e, x - baseX, env.Ppd, keepAfter: false);
+            alone = double.IsNaN(right);
         }
         if (alone)
         {
-            using var line = env.Formatter.FormatLine(new Source(this) { End = e }, s, 1e6, new MdParaProps(look, lineHeight), null);
-            line.Draw(dc, new Point(x, y + dy), InvertAxes.None);
+            // kept while the text is on screen: a resize or a scroll back finds most such lines as they were
+            aloneDrawn ??= [];
+            var key = (s, e, lineHeight);
+            if (!aloneDrawn.TryGetValue(key, out var drawn))
+            {
+                if (aloneDrawn.Count >= 256) aloneDrawn.Clear(); // lines of widths long gone
+                using var line = env.Formatter.FormatLine(new Source(this) { End = e }, s, 1e6, new MdParaProps(look, lineHeight), null);
+                var g = new DrawingGroup();
+                using (var c = g.Open()) line.Draw(c, new Point(0, 0), InvertAxes.None);
+                aloneDrawn[key] = drawn = g;
+            }
+            dc.PushTransform(new TranslateTransform(x, y + dy));
+            dc.DrawDrawing(drawn);
+            dc.Pop();
             return;
         }
         bool clip = !double.IsInfinity(left) || !double.IsInfinity(right);
