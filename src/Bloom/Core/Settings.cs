@@ -104,7 +104,11 @@ internal sealed class Settings
     public string Animation { get; set; } = "system"; // system (Windows' animation effects) | on | reduced (fades only) | off
     public int AnimationFps { get; set; } // 0 = the screen's own rate | 30 | 60
     public string Transparency { get; set; } = "system"; // system (Windows' transparency effects) | off (solid, lighter on the GPU)
+    public int GlassTransparency { get; set; } = 30; // 설정 > 성능 > 유리 투명도: % of the screen behind that shows through the glass (15 … 75; Ui\Theme\Palette.cs Tint)
     public double Scale { get; set; } = 1; // 설정 > 일반 > 크기: 0.8 … 1.5 (Ui\Theme\Theme.cs Zoom)
+    public int MdTextSize { get; set; } = MdTextDefault; // 메모 and 문서's text, Markdown or being written: Ctrl+wheel, Ctrl+0 back to the default (Ui\MdPane.cs)
+    public const int MdTextMin = 10, MdTextMax = 28, MdTextDefault = 14;
+    public int[] DocSize { get; set; } = { 760, 720 }; // the last document window's width and height (Ui\DocWindow.cs): dip at 100 % (Scale multiplies it)
     public List<ToolPlace> Tools { get; set; } = new(); // the open tool windows (Ui\Tools\ToolDock.cs)
     public int Width { get; set; } = DefaultWidth; // the launcher as last sized by hand: dip at 100 % (Scale multiplies it)
     public int Height { get; set; } = DefaultHeight;

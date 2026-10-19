@@ -61,14 +61,20 @@ internal static class AiAccounts
         return a;
     }
 
-    /// An added account leaves with its folder (to the Recycle Bin); a default one can only be hidden.
-    public static void Remove(AiAccount a)
+    /// An added account leaves the list (a default one can only be hidden) → its folder, for UsageLogin.SignOut to sign out
+    /// of and recycle; null when there is none of Bloom's to touch.
+    public static string? Remove(AiAccount a)
     {
-        if (a.IsDefault) return;
+        if (a.IsDefault) return null;
         Settings.Current.AiAccounts.Remove(a);
         Settings.Save();
-        if (a.Home is { } home && IsOurs(home) && Directory.Exists(home) && !Native.ShellFiles.Recycle(home, IntPtr.Zero))
-            Log.Write("ai account: folder not recycled — " + home);
+        return a.Home is { } home && IsOurs(home) && Directory.Exists(home) ? home : null;
+    }
+
+    /// A signed-out account's folder (what Remove gave) goes to the Recycle Bin.
+    public static void Recycle(string home)
+    {
+        if (!Native.ShellFiles.Recycle(home, IntPtr.Zero)) Log.Write("ai account: folder not recycled — " + home);
     }
 
     /// Only a folder right inside Local\accounts goes to the Recycle Bin (a hand-edited settings file can't point it elsewhere).

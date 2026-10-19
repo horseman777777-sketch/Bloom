@@ -2,14 +2,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using Bloom.Ai;
 using Bloom.Core;
 using Bloom.Search;
 
 namespace Bloom.Ui;
 
-/// 설정 > AI 계정: the account list and add rows, each account's menu (AI chat pick, hide/show, sign in again, remove),
-/// the CLI sign-in, the API keys (SettingsView.ApiKeys), and the ChatGPT 조회 방식 and 조회 간격 rows.
+/// 설정 > AI 계정: the account list and add rows, each account's menu (AI chat pick, hide/show, sign in again, sign out)
+/// and an added one's X (sign out), the CLI sign-in, the API keys (SettingsView.ApiKeys), and the ChatGPT 조회 방식 and
+/// 조회 간격 rows.
 internal sealed partial class SettingsView
 {
     private void PageAccounts(Settings s, string filter)
@@ -31,7 +33,7 @@ internal sealed partial class SettingsView
                 if (!Demo.On && a.Alias is { Length: > 0 } && a.Email is { Length: > 0 } mail) status = mail + " · " + status; // the title is the user's own words
                 var chip = a.Id == chatId ? Theme.T(Tr("AI 채팅에 사용 중", "Used for AI chat"), 12, Theme.P.Accent, Theme.Medium, false) : null;
                 var account = a;
-                Add(Demo.On ? title : AiAccounts.Label(a), status, chip, G.Account, () => AccountMenu(account), null, filter);
+                Add(Demo.On ? title : AiAccounts.Label(a), status, a.IsDefault ? chip : SignOutEnd(chip, account), G.Account, () => AccountMenu(account), null, filter);
             }
             Add(Tr($"{title} 계정 추가…", $"Add a {title} account…"), Tr("새 터미널에서 공식 로그인 실행 · 브라우저에서 로그인", "Runs the official sign-in in a new terminal · sign in in the browser"), null, G.Add, () =>
             {
@@ -59,20 +61,57 @@ internal sealed partial class SettingsView
         Add(Tr("조회 간격", "How often"), Tr($"기본 계정은 홈 화면 설정의 간격대로 · 추가한 계정은 {AiUsage.ExtraMinutes}분마다 · 홈의 ↻는 모든 계정", $"Default accounts as set on the home page · added ones every {AiUsage.ExtraMinutes} min · the home's ↻ checks all"), null, G.Clock, null, null, filter);
     }
 
-    /// An account's choices: use it for AI chat, sign in again, hide it from the home or take it out.
+    /// An added account's line ends in its X (로그아웃), after the AI chat chip when it has one.
+    private FrameworkElement SignOutEnd(TextBlock? chip, AiAccount a)
+    {
+        var end = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        if (chip is not null)
+        {
+            chip.VerticalAlignment = VerticalAlignment.Center;
+            chip.Margin = new Thickness(0, 0, 8, 0);
+            end.Children.Add(chip);
+        }
+        end.Children.Add(ToolUi.Button(G.Close, Tr("로그아웃", "Sign out"), () => SignOut(a)));
+        return end;
+    }
+
+    /// The account's sign-in terminal is open: said, and nothing else is done to the account until it closes.
+    private bool TerminalOpen(AiAccount a)
+    {
+        if (!UsageLogin.Open(a)) return false;
+        ConfirmWindow.Tell(Window.GetWindow(this), AiAccounts.Label(a), Tr("로그인 터미널이 열려 있습니다. 로그인을 마치거나 터미널을 닫으세요.", "The sign-in terminal is open. Finish signing in or close it."));
+        return true;
+    }
+
+    /// The X and the menu's 로그아웃: asked once, then the account is off the list at once and its CLI signs it out behind
+    /// (UsageLogin.SignOut); AI chat on it goes back to the default account.
+    private void SignOut(AiAccount a)
+    {
+        if (TerminalOpen(a)) return;
+        bool chat = AiAccounts.Chat(a.Kind).Id == a.Id;
+        string what = Tr("이 계정에서 로그아웃하고 목록에서 뺍니다. 다시 쓰려면 계정을 새로 추가하세요.", "Signs this account out and takes it off the list. Add it again to use it.");
+        if (chat) what += " " + Tr("AI 채팅은 기본 계정으로 돌아갑니다.", "AI chat goes back to the default account.");
+        if (ConfirmWindow.Ask(Window.GetWindow(this), AiAccounts.Label(a), what, (Tr("로그아웃", "Sign out"), MessageBoxResult.Yes), (Tr("취소", "Cancel"), MessageBoxResult.No)) != MessageBoxResult.Yes) return;
+        if (chat)
+        {
+            AiAccounts.UseForChat(a.Kind, AiAccounts.DefaultId(a.Kind));
+            host.Chats.EndAll();
+        }
+        _ = UsageLogin.SignOut(a);
+        AiUsage.Forget(a.Id);
+        Build(lastFilter);
+    }
+
+    /// An account's choices: use it for AI chat, sign in again, hide it from the home or sign it out.
     private void AccountMenu(AiAccount a)
     {
         var owner = Window.GetWindow(this);
-        if (UsageLogin.Open(a))
-        {
-            ConfirmWindow.Tell(owner, AiAccounts.Label(a), Tr("로그인 터미널이 열려 있습니다. 로그인을 마치거나 터미널을 닫으세요.", "The sign-in terminal is open. Finish signing in or close it."));
-            return;
-        }
+        if (TerminalOpen(a)) return;
         bool chat = AiAccounts.Chat(a.Kind).Id == a.Id;
         var choices = new List<(string, MessageBoxResult)>();
         if (!chat) choices.Add((Tr("AI 채팅에 사용", "Use for AI chat"), MessageBoxResult.OK));
         choices.Add(a.IsDefault ? (a.Hidden ? Tr("홈에 표시", "Show on the home") : Tr("홈에서 숨기기", "Hide on the home"), MessageBoxResult.Yes) : (Tr("다시 로그인", "Sign in again"), MessageBoxResult.Yes));
-        if (!a.IsDefault) choices.Add((Tr("계정 빼기", "Remove"), MessageBoxResult.No));
+        if (!a.IsDefault) choices.Add((Tr("로그아웃", "Sign out"), MessageBoxResult.No));
         choices.Add((Tr("닫기", "Close"), MessageBoxResult.Cancel));
         switch (ConfirmWindow.Ask(owner, AiAccounts.Label(a), a.IsDefault ? Tr("기본 계정", "Default account") : Tr("Bloom에서 추가한 계정", "Added in Bloom"), choices.ToArray()))
         {
@@ -97,15 +136,8 @@ internal sealed partial class SettingsView
                 _ = SignIn(a);
                 break;
             case MessageBoxResult.No:
-                if (ConfirmWindow.Ask(owner, Tr("계정 빼기", "Remove account"), Tr("이 계정의 로그인 폴더를 휴지통으로 옮깁니다.", "Moves this account's sign-in folder to the Recycle Bin."), (Tr("빼기", "Remove"), MessageBoxResult.Yes), (Tr("취소", "Cancel"), MessageBoxResult.No)) != MessageBoxResult.Yes) break;
-                if (chat)
-                {
-                    AiAccounts.UseForChat(a.Kind, AiAccounts.DefaultId(a.Kind));
-                    host.Chats.EndAll();
-                }
-                AiAccounts.Remove(a);
-                AiUsage.Forget(a.Id);
-                break;
+                SignOut(a);
+                return;
             default:
                 return;
         }

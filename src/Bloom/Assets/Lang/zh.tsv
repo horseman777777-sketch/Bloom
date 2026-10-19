@@ -1682,8 +1682,9 @@ Hide on the home	在主页隐藏
 Sign in again	重新登录
 Default account	默认账户
 This account's renewed sign-in isn't saved yet. Try again in a moment.	尚未能保存此账户更新后的登录信息。请稍后再试。
-Remove account	移除账户
-Moves this account's sign-in folder to the Recycle Bin.	将此账户的登录文件夹移到回收站。
+Sign out	退出登录
+Signs this account out and takes it off the list. Add it again to use it.	退出此账户的登录并将其从列表中移除。如需再次使用，请重新添加该账户。
+AI chat goes back to the default account.	AI 聊天将改回使用默认账户。
 API keys	API 密钥
 No key · click to add one	无密钥 · 点击添加密钥
 Loading the model list…	正在加载模型列表…
@@ -1961,6 +1962,8 @@ Lower uses less GPU and CPU	越低越省 GPU 和 CPU
 60	60
 Glass effect	玻璃效果
 Off: a solid background, lighter on the GPU	关闭：纯色背景，减轻 GPU 负担
+Glass transparency	玻璃透明度
+Higher shows more of the screen behind. Applies while the glass effect is on.	数值越大，越能透出后面的画面。玻璃效果开启时生效。
 Restart Bloom to apply GPU drawing.	重新启动 Bloom 以应用 GPU 绘制。
 GPU drawing (experimental)	GPU 绘制（实验性）
 Draws the screen with the GPU. Some PCs may stutter or freeze for seconds. Off: the CPU draws, with about 30 MB less memory.	用 GPU 绘制界面。部分电脑上画面可能卡顿或停住几秒。关闭后用 CPU 绘制，内存少约 30 MB。
@@ -2038,6 +2041,10 @@ New note	新便笺
 Saved as you type · {0}	边写边保存 · {0}
 No saved notes. Type above and press Enter.	尚无已保存的笔记。请在上方输入并按 Enter。
 No note matches · Enter saves a new note	无匹配笔记 · Enter 保存新笔记
+Too long to view as Markdown · editor only	内容过长，仅在编辑界面显示
+Text size {0}	字号 {0}
+Edit	编辑
+View (Markdown)	查看 (Markdown)
 Delete (to the Recycle Bin)	删除 (移到回收站)
 s	秒
 What for (or ‘3pm meeting’)	内容 (或 ‘3pm meeting’)
@@ -2050,3 +2057,33 @@ just now	刚刚
 Detach from the launcher	从启动器分离
 Always on top	始终置顶
 Attach to the launcher	附到启动器
+Markdown document	Markdown 文档
+Bloom's document window to read and edit Markdown (.md) files	用于查看和编辑 Markdown (.md) 文件的 Bloom 文档窗口
+View in Bloom	在 Bloom 中查看
+Couldn't open the file	无法打开文件
+Has characters this file can't hold	包含此文件无法保存的字符
+No permission to change this file	没有修改此文件的权限
+The file is read-only	该文件为只读
+Not UTF-8, so it can't be edited	不是 UTF-8，因此无法编辑
+Has unreadable characters, so it can't be edited	包含无法读取的字符，因此无法编辑
+Over 10 MB · only its start, as plain text	超过 10 MB · 仅以纯文本显示开头部分
+Markdown documents (.md)	Markdown 文档 (.md)
+Bloom in Explorer's ‘Open with’ · ‘View in Bloom’ on .md files you find	资源管理器“打开方式”中的 Bloom · 搜索到的 .md 文件上的“在 Bloom 中查看”
+Reload	重新读取
+Save mine	保存我的版本
+Not saved · another program is using the file, trying again	未保存 · 其他程序正在使用该文件，稍后重试
+Not saved	未保存
+The file was deleted or moved · the text is still here	文件已被删除或移动 · 文本仍保留在这里
+Another program changed this file	其他程序更改了此文件
+View only	仅查看
+Unsaved changes	未保存的更改
+What you changed isn't in the file yet. Saving yours puts this text in the file.	你更改的内容尚未保存到文件。保存你的版本后，文件将变为此文本。
+Don't save	不保存
+‘{0}’ isn't there	找不到“{0}”
+Make it the default app	设为默认应用
+Pick Bloom for .md files in Windows Settings, and a double-click in Explorer opens them in Bloom's document window	在 Windows 设置中将 Bloom 选为打开 .md 文件的应用后，在资源管理器中双击即可在 Bloom 文档窗口中打开
+Bloom recovery	Bloom 恢复
+Bloom couldn't open the file	Bloom 无法打开文件
+The file isn't there, or it can't be opened	文件不存在，或无法打开
+The running Bloom didn't answer	正在运行的 Bloom 没有响应
+Bloom wasn't ready within 30 seconds	Bloom 未能在 30 秒内准备就绪

@@ -98,6 +98,7 @@ internal sealed partial class Host
         Icons.Start(ui);
         Window = new Launcher(this) { Capturing = Opt.CaptureDir is not null };
         Tools = new ToolDock(this);
+        DocWindow.Gone += Window.TrimSoon;
         if (Opt.ResponsiveRounds is { } responsive)
         {
             _ = ResponsivenessBench.Run(this, ui, responsive);
@@ -193,15 +194,22 @@ internal sealed partial class Host
                 tray = new Tray();
                 tray.Toggle += Summon;
                 tray.OpenSettings += OpenSettings;
-                tray.Quit += QuitForGood;
+                tray.Quit += () => QuitForGood();
             }
             if (Settings.Current.Autostart && !Paths.IsDev && !Autostart.IsCurrent()) Autostart.Set(true);
+            FileAssoc.Repair(); // Explorer's 연결 프로그램 for .md: this exe (an install moved, settings brought in)
             if (!Opt.Demo) Updates.Start(ui);
-            // UI-thread stalls go to the log, longer ones with a dump in Local\stalls; watched once start-up has settled
-            ui.BeginInvoke(DispatcherPriority.ApplicationIdle, () => stalls = new StallWatch(ui, Log.Write, () => StallWatch.TriageDump(System.IO.Path.Combine(Paths.Local, "stalls"))));
+            // UI-thread stalls go to the log; watched once start-up has settled
+            ui.BeginInvoke(DispatcherPriority.ApplicationIdle, () => stalls = new StallWatch(ui, Log.Write));
+            _ = System.Threading.Tasks.Task.Run(() => StallWatch.RemoveOldDumps(System.IO.Path.Combine(Paths.Local, "stalls")));
             Window.Prewarm();
             Tools.Restore(); // floating tool windows come back now, attached ones with the launcher
-            if (Settings.Current.Onboarded != true) ShowOnboarding();
+            // started by Explorer's 연결 프로그램: the document only — no launcher, and the first-run screens wait for the next start
+            if (Opt.Open is { } doc)
+            {
+                if (!OpenDoc(doc)) ui.BeginInvoke(() => DocHandoff.Tell(doc, DocHandoff.Refused)); // never silently
+            }
+            else if (Settings.Current.Onboarded != true) ShowOnboarding();
             else if (Opt.Settings) OpenSettings();
             else if (Opt.Show) Summon();
             if (!Opt.Demo && Opt.MeasureSeconds is null && Opt.SummonRounds is null && ReleaseNotes.JustUpdated())
@@ -519,6 +527,7 @@ internal sealed partial class Host
     /// Pending debounced writes go to disk now (quit, restart, Windows signing out).
     public void SaveAll()
     {
+        DocWindow.FlushAll(); // documents being written go to their files
         Chats.Flush(); // explicit save/export boundary; normal chat updates queue immutable snapshots
         Settings.Flush();
         Usage.Flush();
@@ -534,16 +543,21 @@ internal sealed partial class Host
     }
 
     /// `save: false` is the reset: nothing in memory goes back to the data that is about to be deleted.
-    /// Quitting on purpose (the tray, 끝내기, --quit): a downloaded update goes in once Bloom has ended.
-    public void QuitForGood()
+    /// Quitting on purpose (the tray, 끝내기, --quit): a downloaded update goes in once Bloom has ended. `ask`: a document
+    /// window with edits not in its file yet asks first (취소 keeps Bloom running); --quit doesn't (a script waits on it):
+    /// Quit keeps them in a copy beside the file.
+    public void QuitForGood(bool ask = true)
     {
+        if (ask && !DocWindow.SettleAll()) return;
         Updates.ApplyOnQuit();
         Quit();
     }
 
-    /// 설정 > 정보 > 다시 시작해서 업데이트: everything saved, then the update goes in and the new Bloom starts.
+    /// 설정 > 정보 > 다시 시작해서 업데이트: everything saved, then the update goes in and the new Bloom starts (unless a
+    /// document's edits that can't be written yet are kept by 취소).
     public void UpdateNow()
     {
+        if (!DocWindow.SettleAll()) return;
         stalls?.Dispose(); // the saving and shutting down below may hold the UI thread on purpose
         Tools.Save();
         SaveAll();
@@ -560,6 +574,8 @@ internal sealed partial class Host
             Tools.Save(); // where the tool windows are, before the settings are written
             SaveAll();
         }
+        DocWindow.RescueAll(); // a document is the user's file, kept even by the reset: what can't be written goes to a copy
+        DocWindow.Quitting();
         Chats.Shutdown(save);
         winKey?.Dispose();
         Clipboard.Dispose();

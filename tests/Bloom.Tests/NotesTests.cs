@@ -24,4 +24,16 @@ internal static class NotesTests
         Check.True(Notes.Find(b.Id) is null && Notes.Current.Items.Count == 2, "an empty note just goes (nothing to the Recycle Bin)");
         Notes.Current.Items.Clear();
     }
+
+    public static void TitleWithoutHeadingMarks()
+    {
+        Notes.Current.Items.Clear();
+        var shop = Notes.New("# 장보기\n- [ ] 우유");
+        Check.Eq(shop.Title, "장보기", "a Markdown heading's # goes");
+        Check.Eq(Notes.New("###   회의 메모  \r\n본문").Title, "회의 메모", "any number of them, and the spaces after");
+        Check.Eq(Notes.New("#해시태그\n").Title, "#해시태그", "a # with no space after is kept (not a heading)");
+        Check.Eq(Notes.New("#\n").Title, "빈 메모", "a heading with nothing in it: as empty");
+        Check.True(Matcher.Score(new Query("장보기"), shop.Match) > 0, "the search finds it by its title");
+        Notes.Current.Items.Clear();
+    }
 }

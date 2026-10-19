@@ -24,6 +24,7 @@ internal static class Features
         ("search", "quicklinks", Tr("브라우저 바로 가기", "Site shortcuts"), Tr("‘yt 고양이’처럼 단축어로 사이트 검색", "Search a site by keyword, like ‘yt cats’"), G.Link),
         ("search", "mine", Tr("사용자 명령", "Custom commands"), Tr("직접 만든 스크립트 · 글 조각 · 연속 실행", "Your own scripts, snippets and chains"), G.Code),
         ("tools", "notes", Tr("메모장 · 도구 창", "Notes & tool windows"), Tr("메모 · 타이머 · 계산기 · 클립보드를 런처 옆 창으로 · 검색줄에서 메모 찾기", "Notes, timers, calculator and clipboard in windows beside the launcher · notes in the search line"), G.Document),
+        ("tools", "docs", Tr("마크다운 문서 (.md)", "Markdown documents (.md)"), Tr("탐색기의 ‘연결 프로그램’에 Bloom · 검색한 .md 파일의 ‘Bloom으로 보기’", "Bloom in Explorer's ‘Open with’ · ‘View in Bloom’ on .md files you find"), G.Page),
         ("tools", "windows", Tr("창 전환", "Switch windows"), Tr("열린 창 목록 · 검색 결과 아래의 창과 그 단축키", "The open windows list, windows under the results, and its shortcut"), G.NewWindow),
         ("tools", "layout", Tr("창 배치", "Window layout"), Tr("‘왼쪽 절반’ ‘최대화’ ‘다음 화면으로’처럼 앞의 창 옮기기", "Move the window in front: ‘left half’, ‘maximize’, ‘next screen’"), ''),
         ("tools", "winget", Tr("앱 설치 (winget)", "Install apps (winget)"), Tr("‘설치 vlc’처럼 찾아서 Enter로 설치 — Windows의 winget으로, 할 때마다 확인 창이 표시됩니다", "Find one like ‘install vlc’ and Enter installs it — through Windows' winget, asked every time"), G.Download),

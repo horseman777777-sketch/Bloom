@@ -28,6 +28,8 @@ internal static class Program
     ///       starts).
     ///       --claude-approve [--data <dir>] (Claude Code's PermissionRequest hook: the request to the running Bloom's
     ///       card, its answer as the hook's JSON; nothing starts).
+    ///       --open <file> (Explorer's 연결 프로그램 for .md: the file in its document window — handed to the running Bloom,
+    ///       else Bloom starts in the tray with it open, without the launcher).
     [STAThread]
     private static int Main(string[] args)
     {
@@ -47,9 +49,10 @@ internal static class Program
             .SetAutoApplyOnStartup(false)
             .OnBeforeUninstallFastCallback(_ =>
             {
-                // the Run entry and Claude Code's approval hook would point at a removed exe
+                // the Run entry, Claude Code's approval hook and Explorer's 연결 프로그램 would point at a removed exe
                 Autostart.Set(false);
                 Ai.ClaudeHooks.Remove();
+                FileAssoc.Set(false);
             })
             .Run();
         var opt = new Options();
@@ -119,6 +122,9 @@ internal static class Program
                 case "--show":
                     opt.Show = true;
                     break;
+                case DocHandoff.Arg when i + 1 < args.Length:
+                    opt.Open = args[++i];
+                    break;
                 case "--settings":
                     opt.Settings = true;
                     break;
@@ -166,8 +172,38 @@ internal static class Program
         if (resetFrom >= 0) Reset(resetFrom);
         else if (restartFrom >= 0) WaitFor(restartFrom);
 
+        opt.Open = FullPath(opt.Open); // from the folder it was started in (this process moves to the home folder below)
+
         string id = Paths.InstanceId;
         using var mutex = new Mutex(true, @"Local\" + id, out bool first);
+        if (!first && opt.Open is { } doc && !quit)
+        {
+            // the running Bloom opens it. One still starting has no pipe yet: waited for (30 s). One that has just quit lets
+            // go of the mutex: this start takes it and opens the file itself (Explorer starts one Bloom per file selected).
+            // A file that doesn't open says so in a message box.
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (!first)
+            {
+                switch (DocHandoff.Send(DocHandoff.Pipe, doc))
+                {
+                    case DocHandoff.Answer.Opened:
+                        return 0;
+                    case DocHandoff.Answer.Refused:
+                        DocHandoff.Tell(doc, DocHandoff.Refused);
+                        return 5;
+                    case DocHandoff.Answer.Silent:
+                        DocHandoff.Tell(doc, Tr("실행 중인 Bloom이 응답하지 않았습니다", "The running Bloom didn't answer"));
+                        return 7;
+                }
+                if (clock.ElapsedMilliseconds > 30000)
+                {
+                    DocHandoff.Tell(doc, Tr("Bloom이 30초 안에 준비되지 않았습니다", "Bloom wasn't ready within 30 seconds"));
+                    return 6;
+                }
+                Thread.Sleep(150);
+                first = Take(mutex);
+            }
+        }
         if (!first && export is not null) return 3; // quit Bloom first: it may hold unsaved settings
         if (!first)
         {
@@ -209,13 +245,19 @@ internal static class Program
             e.Handled = true;
         };
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("fatal " + e.ExceptionObject);
-        app.SessionEnding += (_, _) => host.SaveAll();
+        app.SessionEnding += (_, _) =>
+        {
+            host.SaveAll();
+            Ui.DocWindow.RescueAll(); // no one to ask: what a document couldn't write goes to a copy beside it
+        };
         app.Startup += (_, _) =>
         {
+            // first: a start handing a file over waits for this pipe; what it hands over opens once the start is done
+            DocHandoff.Listen(DocHandoff.Pipe, path => app.Dispatcher.InvokeAsync(() => host.OpenDoc(path)).Task);
             host.Start();
             Listen(id + ".Show", () => host.Summon());
             Listen(id + ".Settings", host.OpenSettings);
-            Listen(id + ".Quit", host.QuitForGood);
+            Listen(id + ".Quit", () => host.QuitForGood(ask: false)); // a script waits on it (install.ps1): nothing asks
         };
         app.Run();
         return 0;
@@ -276,6 +318,33 @@ internal static class Program
         catch (System.ComponentModel.Win32Exception)
         {
             // the id now belongs to a process this one can't open: ours is gone
+        }
+    }
+
+    /// The single-instance mutex, when the Bloom that held it has ended (abandoned or let go): this start's now.
+    private static bool Take(Mutex mutex)
+    {
+        try
+        {
+            return mutex.WaitOne(0);
+        }
+        catch (AbandonedMutexException)
+        {
+            return true; // its Bloom ended without letting go: the mutex is this thread's all the same
+        }
+    }
+
+    /// A path made full; null for none, or for one that isn't a path.
+    private static string? FullPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        try
+        {
+            return Path.GetFullPath(path);
+        }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
         }
     }
 

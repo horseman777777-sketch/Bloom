@@ -74,6 +74,15 @@ internal static class Win32
     public const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10, SWP_SHOWWINDOW = 0x40, SWP_FRAMECHANGED = 0x20;
     public static readonly IntPtr HWND_TOPMOST = new(-1), HWND_NOTOPMOST = new(-2), HWND_MESSAGE = new(-3);
     public const int WM_MOVING = 0x0216, WM_SIZING = 0x0214, WM_ENTERSIZEMOVE = 0x0231, WM_EXITSIZEMOVE = 0x0232;
+    // a window's own caption buttons (DocWindow): hit-testing, and the mouse over the non-client area
+    public const int WM_NCHITTEST = 0x0084, WM_NCMOUSEMOVE = 0x00A0, WM_NCLBUTTONDOWN = 0x00A1, WM_NCLBUTTONUP = 0x00A2, WM_NCMOUSELEAVE = 0x02A2;
+    public const int HTMAXBUTTON = 9;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct TRACKMOUSEEVENT { public int cbSize; public uint dwFlags; public IntPtr hwndTrack; public uint dwHoverTime; }
+
+    public const uint TME_LEAVE = 0x2, TME_NONCLIENT = 0x10;
+    [DllImport("user32.dll")] public static extern bool TrackMouseEvent(ref TRACKMOUSEEVENT tme);
     public const int GWL_EXSTYLE = -20;
     public const long WS_EX_TOOLWINDOW = 0x80, WS_EX_APPWINDOW = 0x40000, WS_EX_NOACTIVATE = 0x08000000;
 
@@ -196,6 +205,7 @@ internal static class Win32
     public struct COPYDATASTRUCT { public UIntPtr dwData; public int cbData; public IntPtr lpData; }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, ref COPYDATASTRUCT lParam);
+    [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageTimeoutW")]
     public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, IntPtr wParam, ref COPYDATASTRUCT lParam, uint flags, uint timeout, out IntPtr result);
     [DllImport("user32.dll")] public static extern bool ChangeWindowMessageFilterEx(IntPtr hwnd, uint msg, uint action, IntPtr changeInfo);
@@ -239,6 +249,24 @@ internal static class Win32
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern int SHOpenFolderAndSelectItems(IntPtr pidlFolder, uint cidl, IntPtr[]? apidl, uint flags);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr ILCreateFromPath(string path);
     [DllImport("shell32.dll")] public static extern void ILFree(IntPtr pidl);
+
+    /// Explorer told that file types, their icons or what opens them changed (SHCNE_ASSOCCHANGED).
+    public const int SHCNE_ASSOCCHANGED = 0x08000000;
+    [DllImport("shell32.dll")] public static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+
+    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)] private static extern int AssocQueryString(uint flags, int str, string assoc, string? extra, StringBuilder? output, ref uint length);
+
+    /// The program Windows opens a file type with now (".md" → its exe; ASSOCF_NONE, ASSOCSTR_EXECUTABLE, "open"); null
+    /// when none is set.
+    public static string? AssocExecutable(string ext)
+    {
+        uint length = 1024;
+        var sb = new StringBuilder((int)length);
+        return AssocQueryString(0, 2 /* ASSOCSTR_EXECUTABLE */, ext, "open", sb, ref length) == 0 && sb.Length > 0 ? sb.ToString() : null;
+    }
+
+    /// The process serving a named pipe (the running Bloom, to hand it the foreground).
+    [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint pid);
 
     /// Whether Windows would show a notification now: 1 not present (locked, screensaver), 2 busy (a full-screen app),
     /// 3 a full-screen Direct3D game, 4 presentation mode, 5 accepts, 6 quiet time, 7 a Windows Store app in front.

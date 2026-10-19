@@ -7,17 +7,21 @@ using Bloom.Search;
 
 namespace Bloom.Ui;
 
-/// 메모: the list of notes (search, pinned first) and one note open to write in; every keystroke is kept.
+/// 메모: the list of notes (search, pinned first) and one note open to write in (MdPane: written first, 보기 draws it
+/// as Markdown); every keystroke and ticked box is kept.
 internal sealed class NotesTool : ITool
 {
     private readonly Grid view = new();
     private readonly Grid listPage = new();
+    private readonly Grid page = new();
     private readonly StackPanel list = new() { Margin = new Thickness(8, 4, 8, 8) };
-    private readonly TextBox search, editor;
+    private readonly TextBox search;
     private readonly StackPanel head = new() { Orientation = Orientation.Horizontal };
+    private readonly Border modeSlot = new(); // the open note's 보기 / 편집
     private readonly SmoothBorder backButton, deleteButton;
     private readonly TextBlock saved;
     private Note? note; // the open one; null: the list
+    private MdPane? pane; // the open note's text
 
     public string Key => "notes";
     public string Name => Tr("메모", "Notes");
@@ -48,33 +52,9 @@ internal sealed class NotesTool : ITool
             Open(hit ?? Notes.New(q));
         };
 
-        // one note: the text, and when it was kept
-        var page = new Grid();
+        // one note: the text (a pane per note, Open), and when it was kept
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        editor = new TextBox
-        {
-            FontFamily = Theme.Sans,
-            FontSize = 14,
-            Foreground = Theme.P.Text,
-            CaretBrush = Theme.P.Accent,
-            SelectionBrush = Theme.P.Selection,
-            SelectionOpacity = 1,
-            Background = System.Windows.Media.Brushes.Transparent,
-            BorderThickness = new Thickness(0),
-            AcceptsReturn = true,
-            AcceptsTab = true,
-            TextWrapping = TextWrapping.Wrap,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Padding = new Thickness(14, 12, 12, 8),
-        };
-        editor.TextChanged += (_, _) =>
-        {
-            if (note is null) return;
-            Notes.SetText(note, editor.Text);
-            saved!.Text = Tr("저장됨", "Saved");
-        };
-        page.Children.Add(editor);
         saved = Theme.T("", 11.5, Theme.P.TextFaint);
         saved.Margin = new Thickness(14, 2, 14, 8);
         Grid.SetRow(saved, 1);
@@ -90,6 +70,7 @@ internal sealed class NotesTool : ITool
             note = null;
             Open(null);
         });
+        head.Children.Add(modeSlot);
         head.Children.Add(backButton);
         head.Children.Add(deleteButton);
         head.Children.Add(ToolUi.Button(G.Add, Tr("새 메모", "New note"), () => Open(Notes.New())));
@@ -98,29 +79,36 @@ internal sealed class NotesTool : ITool
         Open(noteId is null ? null : Notes.Find(noteId));
     }
 
-    /// Shows a note by its id (the search line's results open their note here).
+    /// Shows a note by its id (the search line's results open their note here); the one already open stays as it is
+    /// (보기 or 편집; what was written into it is in its pane already, OnChanged).
     public void Show(string id)
     {
-        if (Notes.Find(id) is { } n) Open(n);
+        if (Notes.Find(id) is { } n && !ReferenceEquals(n, note)) Open(n);
     }
 
     /// QA: a note being written, as typed so far (a new one on the first call).
     public void TypeForQa(string text)
     {
         if (note is null) Open(Notes.New());
-        editor.Text = text;
-        editor.CaretIndex = text.Length;
+        if (pane is null) return;
+        pane.Text = text;
+        Typed(text);
     }
+
+    /// QA: the open note's pane (보기, the text size).
+    public MdPane? PaneForQa => pane;
 
     private void Open(Note? n)
     {
         // an empty note left behind just goes
         if (note is { } was && !ReferenceEquals(was, n) && was.Text.Trim().Length == 0 && Notes.Find(was.Id) is not null) Notes.Delete(was);
         note = n;
-        var page = (FrameworkElement)view.Children[1];
         listPage.Visibility = n is null ? Visibility.Visible : Visibility.Collapsed;
         page.Visibility = n is null ? Visibility.Collapsed : Visibility.Visible;
-        backButton.Visibility = deleteButton.Visibility = n is null ? Visibility.Collapsed : Visibility.Visible;
+        modeSlot.Visibility = backButton.Visibility = deleteButton.Visibility = n is null ? Visibility.Collapsed : Visibility.Visible;
+        if (pane is not null) page.Children.Remove(pane);
+        pane = null;
+        modeSlot.Child = null;
         if (n is null)
         {
             search.Clear();
@@ -128,11 +116,23 @@ internal sealed class NotesTool : ITool
         }
         else
         {
-            editor.Text = n.Text;
-            editor.CaretIndex = editor.Text.Length;
+            var p = new MdPane(n.Text, false, null, false, false);
+            p.OpenLink = url => DocWindow.FollowLink(url, null, p); // a note has no folder: absolute links only
+            pane = p;
+            pane.Edited += Typed;
+            page.Children.Insert(0, pane);
+            modeSlot.Child = pane.ToggleButton;
             saved.Text = Tr($"자동 저장 · {ToolUi.Ago(n.UpdatedAt)}", $"Saved as you type · {ToolUi.Ago(n.UpdatedAt)}");
         }
         FocusFirst();
+    }
+
+    /// The open note's text as typed (or a box ticked in 보기): kept.
+    private void Typed(string text)
+    {
+        if (note is null) return;
+        Notes.SetText(note, text);
+        saved.Text = Tr("저장됨", "Saved");
     }
 
     private static System.Collections.Generic.IEnumerable<Note> Matching(string q)
@@ -143,8 +143,10 @@ internal sealed class NotesTool : ITool
 
     private void OnChanged(Note? changed)
     {
-        // the open note's own keystrokes don't redraw anything; the list follows every other change
+        // the list follows every change; the open note what was written into it elsewhere (the AI's WriteNote) — its own
+        // keystrokes and ticks are in the pane already
         if (note is null) Fill();
+        else if (ReferenceEquals(changed, note) && pane is { } p && p.Text != note.Text) p.Text = note.Text;
     }
 
     private void Fill()
@@ -192,7 +194,7 @@ internal sealed class NotesTool : ITool
 
     public void FocusFirst()
     {
-        var target = note is null ? search : editor;
+        UIElement target = pane?.KeyTarget ?? search;
         target.Dispatcher.BeginInvoke(() =>
         {
             if (Window.GetWindow(target) is { IsActive: false }) return; // shown for the AI beside a chat: the keyboard stays in the chat

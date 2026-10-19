@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Shell;
 using Bloom.Core;
 using Bloom.Native;
@@ -50,52 +49,26 @@ internal sealed class ToolWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false;
         Topmost = true;
-        WindowStyle = WindowStyle.SingleBorderWindow;
-        Background = Brushes.Transparent;
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = -32000;
         Top = -32000;
-        UseLayoutRounding = true;
-        TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
-        WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 40, GlassFrameThickness = new Thickness(-1), ResizeBorderThickness = new Thickness(6), CornerRadius = new CornerRadius(0), UseAeroCaptionButtons = false });
-
-        var grid = new Grid();
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) });
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1) });
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        GlassFrame.Prepare(this);
 
         // head: the tool's glyph and name (the handle to drag it by), its own buttons, attach, on top, close
-        var head = new Grid { Margin = new Thickness(14, 0, 6, 0) };
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var glyph = Theme.Glyph(tool.Glyph, 13, Theme.P.Accent);
-        glyph.Margin = new Thickness(0, 0, 8, 0);
-        name.Children.Add(glyph);
-        name.Children.Add(Theme.T(tool.Name, 13, Theme.P.Text, Theme.Semi));
-        head.Children.Add(name);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var buttons = new StackPanel();
         if (tool.Head is { } own)
         {
             WindowChrome.SetIsHitTestVisibleInChrome(own, true);
             buttons.Children.Add(own);
         }
-        attachButton = HeadButton(Undock, Tr("런처에서 떼기", "Detach from the launcher"), () => dock.ToggleAttach(this));
-        topButton = HeadButton('', Tr("항상 위", "Always on top"), () => SetOnTop(!OnTop));
+        attachButton = GlassFrame.HeadButton(Undock, Tr("런처에서 떼기", "Detach from the launcher"), () => dock.ToggleAttach(this));
+        topButton = GlassFrame.HeadButton('', Tr("항상 위", "Always on top"), () => SetOnTop(!OnTop));
         buttons.Children.Add(attachButton);
         buttons.Children.Add(topButton);
-        buttons.Children.Add(HeadButton(G.Close, Tr("닫기", "Close"), () => dock.Close(this)));
-        Grid.SetColumn(buttons, 1);
-        head.Children.Add(buttons);
-        grid.Children.Add(head);
+        buttons.Children.Add(GlassFrame.HeadButton(G.Close, Tr("닫기", "Close"), () => dock.Close(this)));
+        var head = GlassFrame.Head(tool.Glyph, tool.Name, buttons, out _);
 
-        var line = new SmoothBorder { Background = Theme.P.Line };
-        Grid.SetRow(line, 1);
-        grid.Children.Add(line);
-        Grid.SetRow(tool.View, 2);
-        grid.Children.Add(tool.View);
-
-        frame = new SmoothBorder { Child = grid };
+        frame = GlassFrame.Frame(head, tool.View);
         Content = frame;
         frame.LayoutTransform = Theme.Zoom; // its size follows the scale through ToolDock (attached ones from the launcher)
         SetEdge(edge);
@@ -183,19 +156,8 @@ internal sealed class ToolWindow : Window
 
     private void Paint()
     {
-        frame.Background = Theme.Acrylic ? Theme.P.Tint : Theme.P.Solid;
+        GlassFrame.Paint(this, frame);
         ((TextBlock)topButton.Child).Foreground = OnTop ? Theme.P.Accent : Theme.P.TextDim;
-        if (Handle != IntPtr.Zero)
-            Glass.Apply(this, Theme.P.Dark, Theme.Acrylic, Theme.P.Dark ? Color.FromRgb(0x35, 0x2E, 0x31) : Color.FromRgb(0xD9, 0xD2, 0xD5));
-    }
-
-    /// A tools' glyph button that still takes clicks inside the draggable head.
-    private static SmoothBorder HeadButton(char glyph, string tip, Action click)
-    {
-        var b = ToolUi.Button(glyph, tip, click);
-        b.Margin = new Thickness(2, 0, 0, 0);
-        WindowChrome.SetIsHitTestVisibleInChrome(b, true);
-        return b;
     }
 
     /// The window's place on the screen, in physical pixels.

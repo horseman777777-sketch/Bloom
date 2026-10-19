@@ -38,6 +38,10 @@ internal sealed class Saver : IDisposable
         return () => Json.SaveText(file, snapshot);
     }, Dispatcher.CurrentDispatcher, delayMs);
 
+    /// For data a UI holds itself (a document's text): `prepare` runs on this thread's dispatcher and takes the snapshot,
+    /// the write it hands back runs on a worker (on the caller's thread for Flush).
+    public static Saver ForUi(Func<Action> prepare, int delayMs) => new(prepare, Dispatcher.CurrentDispatcher, delayMs);
+
     public void Touch()
     {
         lock (stateGate)

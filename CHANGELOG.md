@@ -2,6 +2,30 @@
 
 Each release on GitHub shows its section from this file (the workflow looks for `## <version>`).
 
+## 0.15.0
+
+- Markdown documents (.md) open in Bloom's own document window: it shows in the taskbar like other apps and snaps like other windows. Open one with "View in Bloom" on a .md file you find or with Explorer's "Open with"; in the setup's install, Settings › Features › "Make it the default app" lets a double-click in Explorer open them in Bloom. Settings › Features › Markdown documents turns it off.
+- The document window switches between view (the Markdown drawn) and edit (the text). It saves as you type and keeps the file's encoding and line endings. When another program changes the file, it asks whether to reload it or save yours. Edits not in the file yet are asked about before Bloom quits, restarts or updates; if Bloom is ended before it can ask, they are kept beside the file as "<name> (Bloom recovery <date> <time>).md".
+- Long documents open quickly: only the paragraphs on the screen are drawn (on the test PC a long document opened in 1.4 s instead of 6.5 s, and resizing the window took under 0.1 s instead of up to 20 s). Drag to select across paragraphs (it scrolls at the window's edge), Ctrl+A selects all and Ctrl+C copies; in a wide window the text keeps a comfortable reading width. Files over 10 MB show their start only, as plain text.
+- Documents read better: headings sized by level with space around them, lines wrapped in the file read as one paragraph, tables sized to their content with a tinted header row, and long code wraps after `.` and `/`. Tables and code in AI chat answers and notes are drawn the same way.
+- Notes in Markdown: a note switches between view and edit, checklist boxes can be ticked in the view, a note's `# heading` names it in the list, what the AI adds shows at once, and Ctrl+wheel sets the text size (10–28, Ctrl+0 back to 14).
+- Links in notes and documents open only web pages (http, https) and e-mail (mailto); a link to a file on this PC shows it in its folder. Pictures in network folders are not loaded, so Windows doesn't hand your sign-in to them, unless the document is in that network folder itself.
+- AI accounts: an added account can be signed out with its × or "Sign out" in its menu, after a confirmation. Bloom runs the CLI's own sign-out (for ChatGPT, after stopping Bloom's Codex for it), then moves the account's folder to the Recycle Bin; AI chat goes back to the default account.
+- Glass transparency: Settings › Performance › Display sets how much of the screen behind shows through the glass (15–75 %, 30 % by default).
+- Fixed: a black console window could pop up for a moment when Bloom stalled, for example while opening a long .md file. Bloom no longer writes diagnostic files for stalls; its log still notes each one in a line, and the old files in `%LOCALAPPDATA%\Bloom\stalls` are deleted.
+
+### 한국어
+
+- 마크다운 문서(.md)를 Bloom 전용 문서 창에서 엽니다. 다른 앱처럼 작업 표시줄에 표시되고, 다른 창처럼 화면 가장자리에 붙일 수 있습니다. 검색한 .md 파일의 'Bloom으로 보기'나 탐색기의 '연결 프로그램'으로 엽니다. 설치판에서는 설정 › 기능 › '기본 앱으로 정하기'로 탐색기에서 두 번 클릭할 때 Bloom으로 열리게 할 수 있습니다. 설정 › 기능 › 마크다운 문서에서 끌 수 있습니다.
+- 문서 창은 보기(마크다운을 그린 화면)와 편집(원문)을 오갑니다. 입력하는 대로 저장하고, 파일의 인코딩과 줄바꿈 방식은 그대로 둡니다. 다른 프로그램이 파일을 바꾸면 다시 읽을지, 고친 내용을 저장할지 묻습니다. 아직 파일에 저장되지 않은 내용은 Bloom을 끄거나 다시 시작하거나 업데이트하기 전에 묻습니다. 물을 틈 없이 Bloom이 종료되면 파일 옆에 '<이름> (Bloom 복구 <날짜> <시각>).md' 사본으로 남깁니다.
+- 긴 문서도 빨리 열립니다. 화면에 보이는 문단만 그립니다(시험 PC에서 긴 문서 열기 6.5초 → 1.4초, 창 크기 바꾸기 최대 20초 → 0.1초 미만). 여러 문단에 걸쳐 드래그해 선택하고(창 끝에서는 자동으로 스크롤), Ctrl+A로 전체를 선택하고, Ctrl+C로 복사합니다. 넓은 창에서도 글은 읽기 좋은 폭을 유지합니다. 10MB가 넘는 파일은 앞부분만 텍스트로 표시합니다.
+- 문서가 더 읽기 좋아졌습니다. 제목은 단계별 크기와 여백으로 나뉘고, 파일 안에서 줄을 바꾼 문장은 한 문단으로 이어집니다. 표는 내용에 맞춘 칸 폭과 색을 입힌 머리줄로, 긴 코드는 `.`과 `/` 뒤에서 줄을 바꿉니다. AI 채팅 답변과 메모의 표·코드도 같은 방식으로 그립니다.
+- 메모도 마크다운: 보기와 편집을 오가고, 보기 화면에서 체크리스트를 바로 체크하며, `# 제목`이 목록에 메모 이름으로 표시됩니다. AI가 덧붙인 내용도 바로 반영되고, Ctrl+휠로 글자 크기를 바꿉니다(10~28, Ctrl+0은 14).
+- 메모와 문서의 링크는 웹 페이지(http, https)와 메일(mailto)만 열고, PC 안 파일 링크는 폴더에서 해당 파일을 표시합니다. 네트워크 폴더의 그림은 Windows 로그인 정보가 그쪽으로 전달되지 않도록 불러오지 않습니다. 문서가 그 네트워크 폴더 안에 있을 때만 불러옵니다.
+- AI 계정: 추가한 계정은 ×나 메뉴의 '로그아웃'으로, 확인을 거쳐 로그아웃할 수 있습니다. CLI의 공식 로그아웃을 실행한 뒤(ChatGPT는 그 계정의 Bloom Codex를 먼저 멈춤) 계정 폴더를 휴지통으로 옮기고, AI 채팅은 기본 계정으로 돌아갑니다.
+- 유리 투명도: 설정 › 성능 › 화면에서 유리 너머로 뒤 화면이 비치는 정도를 고릅니다(15~75%, 기본 30%).
+- 수정: Bloom이 잠깐 멈출 때(예: 긴 .md 파일을 열 때) 검은 콘솔 창이 잠깐 뜨던 문제를 고쳤습니다. 멈춤 진단 파일은 더 이상 만들지 않고 로그에 한 줄로만 남기며, `%LOCALAPPDATA%\Bloom\stalls`의 예전 파일은 지웁니다.
+
 ## 0.14.1
 
 - Color palette from a capture: Bloom Lens › 7 (or the palette button on the capture drawing bar) picks the main colors of the area, 5 by default (− + for 3–10). Each swatch shows HEX, RGB and its share; click to copy the HEX. "Copy all" gives a HEX list, CSS variables or a palette image, and a picked color shows gradient suggestions. Worked out on this PC, no AI usage; palettes are kept with the recent colors.

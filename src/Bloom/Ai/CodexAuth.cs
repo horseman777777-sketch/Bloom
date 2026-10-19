@@ -75,6 +75,18 @@ internal static class CodexAuth
         }
     }
 
+    /// The folder's account signed out and leaves (UsageLogin.SignOut): its waiting tokens go, in memory and on disk, so
+    /// none reaches the Recycle Bin with the folder.
+    public static void Forget(string home)
+    {
+        lock (waiting)
+        {
+            waiting.Remove(home);
+            if (!Directory.Exists(home)) return;
+            foreach (string f in Directory.GetFiles(home, "auth.bloom.*.tmp")) Drop(f);
+        }
+    }
+
     public static Auth? From(JsonObject raw) => raw["tokens"] is JsonObject t && Str(t, "access_token") is { } access
         ? new Auth(raw, access, Str(t, "refresh_token"), Str(t, "id_token"), Str(t, "account_id"))
         : null;

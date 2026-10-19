@@ -27,7 +27,7 @@ namespace Bloom.Ai;
 ///   sign-out isn't kept alive by it. A running Codex keeps the sign-in it read, and writes a refresh back after its
 ///   request without looking again, so the link never moves under one: when the account's file is replaced, holds
 ///   another sign-in or is gone — seen by a watch on it, by CodexAuth putting tokens in, by a turn (Ticket.Holds), or
-///   told by UsageLogin before a sign-in (Hold) — the processes on the old one end and are waited for until they're gone,
+///   told by UsageLogin before a sign-in or sign-out (Hold) — the processes on the old one end and are waited for until they're gone,
 ///   and only then is the file linked again, for the next one. A sign-in that can't be told or linked starts none.
 /// - sessions is a junction to the account's sessions folder: the rollouts stay where `codex exec` keeps them, so a saved
 ///   thread id resumes on either.
@@ -191,9 +191,10 @@ internal static class CodexAppHome
         return Task.WhenAll(theirs.Select(Check));
     }
 
-    /// A sign-in is about to run into the account's folder (UsageLogin): every app-server in Bloom's folder for it ends and
-    /// is waited for, the link goes, and none starts until the hold is let go (nor while the login terminal stays open,
-    /// LoginMarker) — nothing of the old sign-in can be written over the new one. Null when one would not end.
+    /// A sign-in or sign-out is about to run in the account's folder (UsageLogin): every app-server in Bloom's folder for it
+    /// ends and is waited for, the link goes, and none starts until the hold is let go (nor while the login terminal stays
+    /// open, LoginMarker) — nothing of the old sign-in can be written over the new one or kept past the sign-out. Null when
+    /// one would not end.
     public static async Task<IDisposable?> Hold(string? accountHome)
     {
         var place = PlaceOf(accountHome);

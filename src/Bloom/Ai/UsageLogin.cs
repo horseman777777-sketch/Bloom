@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Bloom.Core;
 
@@ -89,6 +90,76 @@ internal static class UsageLogin
                 p?.Dispose();
             }
             Changed?.Invoke();
+        }
+    }
+
+    /// The longest a sign-out's CLI may take before it is ended (the folder leaves either way).
+    private static readonly TimeSpan SignOutLongest = TimeSpan.FromSeconds(30);
+
+    /// An added account leaves (설정 > AI 계정 › X or 로그아웃): off the list at once, then its CLI signs it out in its own
+    /// folder — `claude auth logout` with CLAUDE_CONFIG_DIR, `codex logout` with CODEX_HOME, so the default sign-in is
+    /// never touched — and the folder goes to the Recycle Bin without the sign-in file (deleted here when a CLI that is
+    /// missing, failed or ran out of time left it) or tokens Bloom had not put in place yet (CodexAuth.Forget).
+    public static async Task SignOut(AiAccount account)
+    {
+        if (AiAccounts.Remove(account) is not { } home) return;
+        bool claude = account.Kind == "claude";
+        string file = AiAccounts.SignInFile(account)!;
+        IDisposable? hold = null;
+        try
+        {
+            // as for a sign-in: Bloom's app-servers on this sign-in end first, and none starts on it until the folder is gone
+            if (!claude)
+            {
+                hold = await CodexAppHome.Hold(home);
+                if (hold is null) Log.Write("ai sign-out: Bloom's app-servers on the account did not end — " + home);
+            }
+            if (File.Exists(file) && CliFor(account.Kind) is { } cli) await Logout(cli, account.Kind, home);
+        }
+        catch (Exception e) when (e is Win32Exception or InvalidOperationException)
+        {
+            Log.Error("ai sign-out", e);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                Log.Error("ai sign-out", e);
+            }
+            if (!claude) CodexAuth.Forget(home);
+            AiAccounts.Recycle(home);
+            hold?.Dispose();
+        }
+    }
+
+    /// The CLI's own sign-out in the account's folder, with no window; ended after SignOutLongest.
+    private static async Task Logout(string cli, string kind, string home)
+    {
+        var psi = new ProcessStartInfo(cli) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = OneShot.WorkDir() };
+        foreach (string a in kind == "claude" ? new[] { "auth", "logout" } : new[] { "logout" }) psi.ArgumentList.Add(a);
+        Cli.CleanEnvironment(psi);
+        AiAccounts.UseHome(psi, kind, home);
+        using var p = ChildProcess.Spawn(psi);
+        if (p is null) return;
+        using var limit = new CancellationTokenSource(SignOutLongest);
+        try
+        {
+            await p.WaitForExitAsync(limit.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                p.Kill(true);
+            }
+            catch (Exception e)
+            {
+                Log.Error("ai sign-out", e); // gone meanwhile, or part of its tree would not end
+            }
         }
     }
 

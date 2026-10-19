@@ -117,7 +117,7 @@ Answers come from the Claude Code or Codex CLI you have installed and signed in 
 - **AI actions** (Ctrl+Alt+A): in any app, turn the selected text (or the clipboard when nothing is selected) into something else and paste it back.
   - Summarize · translate · fix spelling · polish · shorter · longer · formal · casual · key points as a list · explain simply · draft a reply
   - Or write your own instruction.
-- **Usage**: the home shows Claude's and ChatGPT's 5-hour and weekly limits, as used or as left, refreshed every 5 or 10 minutes. Several accounts of each are supported (Settings › AI accounts): each one signs in with the CLI's own login, and AI chat uses the account you pick. Nothing switches accounts on its own.
+- **Usage**: the home shows Claude's and ChatGPT's 5-hour and weekly limits, as used or as left, refreshed every 5 or 10 minutes. Several accounts of each are supported (Settings › AI accounts): each one signs in with the CLI's own login, and AI chat uses the account you pick. Nothing switches accounts on its own. An added account can be signed out with its × (or its menu): Bloom runs the CLI's own sign-out and moves the account's folder to the Recycle Bin.
 - **Work notifications**: a card in a screen corner and a sound when a Claude Code or Codex task starts, finishes, waits for approval, or nears or regains its usage limit. Click a task's card to go to the terminal or editor window it runs in.
   - Pick one of six positions, the size, the sound and which events.
   - Notifications are hidden during full-screen games and presentations.
@@ -162,6 +162,11 @@ Answers come from the Claude Code or Codex CLI you have installed and signed in 
 - **Notes**: several notes, kept as you type. Pin them; deleted ones go to a trash.
   - Type `note buy milk` in the search line to keep a note at once.
   - Notes are searched too.
+  - Notes are Markdown: switch between view and edit, tick checklist boxes in the view, and a note's `# heading` names it in the list. Ctrl+wheel changes the text size (Ctrl+0 resets it).
+- **Markdown documents (.md)**: open a .md file in Bloom's document window with "View in Bloom" on a file you find, or with Explorer's "Open with". In the setup's install, Settings › Features › "Make it the default app" lets a double-click in Explorer open them in Bloom.
+  - It shows in the taskbar and snaps like other windows. View draws the Markdown, Edit shows the text. Long documents open quickly; drag to select across paragraphs and copy with Ctrl+C.
+  - It saves as you type and keeps the file's encoding and line endings. When another program changes the file, Bloom asks whether to reload it or save yours.
+  - Links open only web pages and e-mail; a link to a file on this PC shows it in its folder. Pictures in network folders load only when the document is in that same folder.
 - **Timers**: set days, hours, minutes and seconds (▲ ▼, the mouse wheel, the arrow keys or digits), write what it is for underneath and press Start or Enter. Left at zero, the line is read as words instead: `10 min`, `3pm meeting`. The time left shows, with 5 more minutes and cancel.
 - **Calculator**: the same sums as the search line. Enter copies the answer and keeps it in the list; the bin in its head clears the list.
 - **Clipboard history** (Ctrl+Alt+V): the text, images and files you copied. Click one to copy it again; pin the ones you keep.
@@ -207,7 +212,7 @@ The empty search line shows the home: favorites, AI usage, this week, timers, re
 - **Features on and off**: disabling a feature (AI chat · Bloom Lens · calculator · timers · color picker · emoji · window switching …) removes it from search results, commands, home and favorites, and releases its shortcut. Saved data is retained.
 - **Look · performance**
   - Dark, light or system theme, and accent color presets
-  - Animations on · reduced · off, how many per second (30 · 60 · max), glass off
+  - Animations on · reduced · off, how many per second (30 · 60 · max), glass off or how see-through it is (15–75 %)
   - Bloom draws with the CPU by default. GPU drawing is experimental: on some PCs the screen may stutter or freeze for a few seconds. Pick it at first start or in Settings › Performance
   - Features that use memory say in the settings how much they add.
 - **Language · first start · moving**
@@ -215,7 +220,7 @@ The empty search line shows the home: favorites, AI usage, this week, timers, re
   - First-run setup covers how to open Bloom, the home and AI features.
   - Export the settings, favorites, app names and browser shortcuts to one file, and import them on another PC.
 - **Problem report**: Settings › About › Problem report copies the version, Windows and the recent log (user name and e-mail addresses hidden) and opens a GitHub issue page. Bloom sends nothing itself.
-- **Stall log**: when Bloom stops responding for half a second or more, its log says so. A freeze past 0.8 s also leaves a small diagnostic file (`%LOCALAPPDATA%\Bloom\stalls`, the newest five, never sent) that shows where Bloom was stuck.
+- **Stall log**: when Bloom stops responding for half a second or more, its log says so.
 
 ## Shortcuts
 

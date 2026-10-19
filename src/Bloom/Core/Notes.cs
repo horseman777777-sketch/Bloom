@@ -15,7 +15,14 @@ internal sealed class Note
     public long Created { get; set; } // unix ms
     public long Updated { get; set; } // unix ms
 
-    [JsonIgnore] public string Title => Text.Split('\n', 2)[0].Trim() is { Length: > 0 } t ? t : Tr("빈 메모", "Empty note");
+    /// The first line, without a Markdown heading's leading #s ("# 장보기" → "장보기").
+    [JsonIgnore] public string Title => Heading(Text.Split('\n', 2)[0].Trim()) is { Length: > 0 } t ? t : Tr("빈 메모", "Empty note");
+
+    private static string Heading(string line)
+    {
+        int marks = line.Length - line.TrimStart('#').Length;
+        return marks > 0 && (marks == line.Length || char.IsWhiteSpace(line[marks])) ? line[marks..].Trim() : line;
+    }
     [JsonIgnore] public DateTime UpdatedAt => DateTimeOffset.FromUnixTimeMilliseconds(Updated).LocalDateTime;
 
     /// What the search line matches: the title, and the rest of the text as words.

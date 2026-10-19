@@ -19,6 +19,14 @@ internal interface IComposerHost
     void ShowToast(string text);
 }
 
+/// A view made of many ReadTexts whose selection can run over several of them (MdView): copying and 모두 선택 are its.
+internal interface ISelectionOwner
+{
+    void CopySelection();
+
+    void SelectEverything();
+}
+
 /// Text in a conversation that can be dragged over and copied (Ctrl+C or the right button), across paragraphs, lists
 /// and tables: a read-only RichTextBox with no frame, caret or scrolling of its own. Copying gives plain text without
 /// the joiners Hangul.KeepAll puts between Korean letters. The wheel scrolls the conversation, not this; any key but a
@@ -97,7 +105,10 @@ internal sealed class ReadText : RichTextBox
 
     // ── copying ─────────────────────────────────────────────────────────────────────────────────
     /// What a copy puts on the clipboard now.
-    public string SelectedText => Hangul.Unjoin(Selection.Text).TrimEnd('\r', '\n');
+    public string SelectedText => AsCopied(Selection.Text);
+
+    /// A TextRange's text as a copy carries it: no Korean joiners, no line break at the end.
+    public static string AsCopied(string text) => Hangul.Unjoin(text).TrimEnd('\r', '\n');
 
     /// The box's own copy (and dragging the selection out) would carry rich text with Bloom's colours and the Korean
     /// joiners: it is stopped, and CopyNow puts plain text on the clipboard instead.
@@ -105,19 +116,34 @@ internal sealed class ReadText : RichTextBox
 
     private void CopyNow()
     {
-        string text = SelectedText;
-        if (text.Length == 0) return;
-        Launch.Copy(text);
-        Host()?.ShowToast(Tr("복사 완료", "Copied"));
-        Back();
+        if (Above<ISelectionOwner>(this) is { } owner)
+        {
+            owner.CopySelection();
+            return;
+        }
+        if (CopyOut(this, SelectedText)) Back();
     }
+
+    /// `text` (unless empty) on the clipboard, and "복사 완료" from the conversation or pane `from` sits in.
+    public static bool CopyOut(DependencyObject from, string text)
+    {
+        if (text.Length == 0) return false;
+        Launch.Copy(text);
+        Above<IComposerHost>(from)?.ShowToast(Tr("복사 완료", "Copied"));
+        return true;
+    }
+
+    /// The copy keys: Ctrl+C, Ctrl+Insert.
+    public static bool IsCopyKey(bool ctrl, Key key) => ctrl && key is Key.C or Key.Insert;
 
     // ── mouse and keys ──────────────────────────────────────────────────────────────────────────
     /// The conversation around it (null while it isn't shown).
-    private IComposerHost? Host()
+    private IComposerHost? Host() => Above<IComposerHost>(this);
+
+    private static T? Above<T>(DependencyObject from) where T : class
     {
-        for (DependencyObject? d = VisualTreeHelper.GetParent(this); d is not null; d = VisualTreeHelper.GetParent(d))
-            if (d is IComposerHost host) return host;
+        for (DependencyObject? d = VisualTreeHelper.GetParent(from); d is not null; d = VisualTreeHelper.GetParent(d))
+            if (d is T found) return found;
         return null;
     }
 
@@ -147,15 +173,26 @@ internal sealed class ReadText : RichTextBox
         menu.Open(new[]
         {
             new ActionItem { Title = Tr("복사", "Copy"), Keys = "Ctrl+C", Glyph = G.Copy, Run = CopyNow },
-            new ActionItem { Title = Tr("모두 선택", "Select all"), Keys = "Ctrl+A", Glyph = G.Page, Run = () => { Focus(); SelectAll(); } },
+            new ActionItem { Title = Tr("모두 선택", "Select all"), Keys = "Ctrl+A", Glyph = G.Page, Run = SelectAllNow },
         });
+    }
+
+    private void SelectAllNow()
+    {
+        if (Above<ISelectionOwner>(this) is { } owner)
+        {
+            owner.SelectEverything();
+            return;
+        }
+        Focus();
+        SelectAll();
     }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0, shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
         Key key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (ctrl && key is Key.C or Key.Insert)
+        if (IsCopyKey(ctrl, key))
         {
             CopyNow();
             e.Handled = true;

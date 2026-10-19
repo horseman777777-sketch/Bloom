@@ -17,16 +17,8 @@ internal static class ClaudeApprovalHook
 {
     public const string Arg = "--claude-approve";
 
-    /// Bloom's approval pipe. Pipe names are machine-wide: this Windows user's sign-in session is part of it.
-    public static string Pipe
-    {
-        get
-        {
-            using var me = System.Diagnostics.Process.GetCurrentProcess();
-            using var user = System.Security.Principal.WindowsIdentity.GetCurrent();
-            return $"{Paths.InstanceId}.approve.{me.SessionId}.{user.User?.Value}";
-        }
-    }
+    /// Bloom's approval pipe.
+    public static string Pipe => Paths.Pipe("approve");
 
     private static readonly UTF8Encoding Utf8 = new(false);
 

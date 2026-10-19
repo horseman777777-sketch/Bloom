@@ -112,7 +112,7 @@ internal static class Theme
     {
         bool dark = setting switch { "dark" => true, "light" => false, _ => SystemDark() };
         Acrylic = Core.Settings.Current.Transparency != "off" && SystemTransparency() && Environment.OSVersion.Version.Build >= 22621;
-        P.Apply(dark, Core.Settings.Current.Accent);
+        P.Apply(dark, Core.Settings.Current.Accent, Core.Settings.Current.GlassTransparency);
         // a ResourceDictionary freezes what it holds, so the scroll thumb gets a fresh copy each time
         if (Application.Current is { } app) app.Resources["AL.Thumb"] = P.Thumb.CloneCurrentValue();
         Changed?.Invoke();

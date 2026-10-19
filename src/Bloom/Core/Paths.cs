@@ -21,6 +21,15 @@ internal static class Paths
     /// or one name per dev --data folder.
     public static string InstanceId => IsDev ? "Bloom.Dev." + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Data.ToLowerInvariant())))[..10] : "Bloom";
 
+    /// One of this copy's named pipes ("approve": Claude Code's approval hook, "open": a file handed over by
+    /// `--open`). Pipe names are machine-wide: this Windows user's sign-in session is part of it.
+    public static string Pipe(string what)
+    {
+        using var me = System.Diagnostics.Process.GetCurrentProcess();
+        using var user = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return $"{InstanceId}.{what}.{me.SessionId}.{user.User?.Value}";
+    }
+
     public static void Init(string? dataOverride)
     {
         if (!string.IsNullOrEmpty(dataOverride))

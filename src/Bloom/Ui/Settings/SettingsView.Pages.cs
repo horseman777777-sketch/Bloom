@@ -363,8 +363,14 @@ internal sealed partial class SettingsView
                 {
                     Features.Set(key, v);
                     host.ApplyHotkeys();
+                    if (key != "docs") return;
+                    FileAssoc.Repair(); // Explorer's 연결 프로그램 follows the switch
+                    Dispatcher.BeginInvoke(() => Build(lastFilter)); // 기본 앱으로 정하기 with it
                 }, out var t);
                 Add(f.name, f.about, sw, f.glyph, t, null, filter);
+                // Windows lets only the user make an app the default: its page, while Bloom is in its list
+                if (key == "docs" && Features.On(key) && FileAssoc.IsRegistered())
+                    Add(Tr("기본 앱으로 정하기", "Make it the default app"), Tr("Windows 설정에서 .md 파일을 열 앱으로 Bloom을 고르세요. 탐색기에서 두 번 클릭하면 Bloom 문서 창으로 열립니다.", "Pick Bloom for .md files in Windows Settings, and a double-click in Explorer opens them in Bloom's document window"), null, G.NewWindow, () => Launch.Open(FileAssoc.DefaultsPage), null, filter);
             }
         }
     }
@@ -552,6 +558,13 @@ internal sealed partial class SettingsView
             new[] { ("system", Tr("시스템", "System")), ("off", Tr("끄기", "Off")) }, s.Transparency, v =>
             {
                 s.Transparency = v;
+                Theme.Apply(s.Theme);
+            }, filter);
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        Choice(Tr("유리 투명도", "Glass transparency"), Tr("클수록 뒤 화면이 더 비칩니다. 유리 효과가 켜져 있을 때 적용됩니다.", "Higher shows more of the screen behind. Applies while the glass effect is on."), G.Palette,
+            new[] { 15, 30, 45, 60, 75 }.Select(x => (x.ToString(inv), $"{x}%")).ToArray(), s.GlassTransparency.ToString(inv), v =>
+            {
+                s.GlassTransparency = int.Parse(v, inv);
                 Theme.Apply(s.Theme);
             }, filter);
         var gpuSw = Toggle(s.GpuDrawing, v =>

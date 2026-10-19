@@ -17,10 +17,14 @@ internal sealed class Palette
 
     private static Color C(uint argb) => Color.FromArgb((byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb);
 
-    public void Apply(bool dark, string accent = "rose")
+    /// `glassTransparency`: 설정 > 성능 > 유리 투명도, the share (%) of the screen behind that shows through the glass.
+    public void Apply(bool dark, string accent, int glassTransparency)
     {
         Base(dark);
         if (Accents.Find(accent) is { Key: not "rose" } a) Recolor(dark, a);
+        // the glass windows' fill over the acrylic: the solid background, see-through by the setting
+        var c = Solid.Color;
+        Tint.Color = Color.FromArgb((byte)Math.Round(2.55 * (100 - Math.Clamp(glassTransparency, 0, 100))), c.R, c.G, c.B);
     }
 
     /// Another colour from the settings: the accent and its soft / text / ink / selection shades, and the
@@ -28,7 +32,7 @@ internal sealed class Palette
     private void Recolor(bool dark, AccentPreset a)
     {
         var accentOnes = new[] { Accent, AccentSoft, AccentText, AccentInk, UserBubble, Selection, Danger };
-        foreach (var b in new[] { Tint, Solid, Text, TextDim, TextFaint, Line, Hover, Selected, Card, CardLine, Tile, TileFg, Key, KeyFg, Popup, PopupLine, Code, Track, Thumb, Well, Raised })
+        foreach (var b in new[] { Solid, Text, TextDim, TextFaint, Line, Hover, Selected, Card, CardLine, Tile, TileFg, Key, KeyFg, Popup, PopupLine, Code, Track, Thumb, Well, Raised })
         {
             var (h, s, l) = Hsl.From(b.Color);
             b.Color = Hsl.To(b.Color.A, a.Gray ? h : a.Hue, a.Gray ? 0 : s, l);
@@ -49,7 +53,6 @@ internal sealed class Palette
         if (dark)
         {
             // bg #0E0B0C · bg-2 #090607 · surface-2 #1E191C · surface-3 #292225 · line base #FDEDF4
-            Set(Tint, 0xB00E0B0C);
             Set(Solid, 0xFF0E0B0C);
             Set(Text, 0xFFF1ECEE);
             Set(TextDim, 0xFFC1B8BB);
@@ -81,7 +84,6 @@ internal sealed class Palette
         else
         {
             // bg #F7F5F6 · bg-2 #F0EDEE · surface-2 #F5F1F3 · ink #2D1C24
-            Set(Tint, 0xB8F7F5F6);
             Set(Solid, 0xFFF7F5F6);
             Set(Text, 0xFF201A1C);
             Set(TextDim, 0xFF534A4E);

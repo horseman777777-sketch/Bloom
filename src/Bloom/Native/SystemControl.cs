@@ -73,7 +73,7 @@ internal static unsafe class SystemControl
         {
             using var k = Registry.CurrentUser.CreateSubKey(Advanced);
             k.SetValue(name, value, RegistryValueKind.DWord);
-            SHChangeNotify(0x08000000 /* SHCNE_ASSOCCHANGED */, 0, IntPtr.Zero, IntPtr.Zero);
+            Win32.SHChangeNotify(Win32.SHCNE_ASSOCCHANGED, 0, IntPtr.Zero, IntPtr.Zero);
             Broadcast("ShellState");
             return true;
         }
@@ -343,7 +343,6 @@ internal static unsafe class SystemControl
 
     [DllImport("ole32.dll")] private static extern int PropVariantClear(ref PropVariant pv);
     [DllImport("powrprof.dll")] private static extern bool SetSuspendState(bool hibernate, bool force, bool wakeupEventsDisabled);
-    [DllImport("shell32.dll")] private static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? root, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, IntPtr wParam, string lParam, uint flags, uint timeout, out IntPtr result);

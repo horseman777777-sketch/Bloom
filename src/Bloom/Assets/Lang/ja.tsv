@@ -1682,8 +1682,9 @@ Hide on the home	ホームで非表示
 Sign in again	再サインイン
 Default account	既定のアカウント
 This account's renewed sign-in isn't saved yet. Try again in a moment.	このアカウントの更新されたサインイン情報をまだ保存できていません。しばらくしてからもう一度お試しください。
-Remove account	アカウントを外す
-Moves this account's sign-in folder to the Recycle Bin.	このアカウントのサインインフォルダーをごみ箱に移動します。
+Sign out	サインアウト
+Signs this account out and takes it off the list. Add it again to use it.	このアカウントからサインアウトし、一覧から外します。もう一度使うには、アカウントを追加し直してください。
+AI chat goes back to the default account.	AI チャットは既定のアカウントに戻ります。
 API keys	API キー
 No key · click to add one	キーなし · クリックしてキーを追加
 Loading the model list…	モデル一覧を読み込み中…
@@ -1961,6 +1962,8 @@ Lower uses less GPU and CPU	低いほど GPU と CPU の使用が少なくなり
 60	60
 Glass effect	ガラス効果
 Off: a solid background, lighter on the GPU	オフ: 単色の背景で GPU が軽くなります
+Glass transparency	ガラスの透明度
+Higher shows more of the screen behind. Applies while the glass effect is on.	大きいほど後ろの画面が透けて見えます。ガラス効果がオンのときに適用されます。
 Restart Bloom to apply GPU drawing.	GPU 描画を適用するには Bloom を再起動してください。
 GPU drawing (experimental)	GPU 描画 (試験的)
 Draws the screen with the GPU. Some PCs may stutter or freeze for seconds. Off: the CPU draws, with about 30 MB less memory.	GPU で画面を描画します。一部の PC では画面がかくついたり数秒止まったりすることがあります。オフにすると CPU で描画し、メモリが約 30 MB 少なくなります。
@@ -2038,6 +2041,10 @@ New note	新しいメモ
 Saved as you type · {0}	入力すると自動保存 · {0}
 No saved notes. Type above and press Enter.	保存済みメモなし。上に入力して Enter を押してください。
 No note matches · Enter saves a new note	該当するメモなし · Enter で新規保存
+Too long to view as Markdown · editor only	長すぎるため編集画面でのみ表示します
+Text size {0}	文字サイズ {0}
+Edit	編集
+View (Markdown)	表示 (Markdown)
 Delete (to the Recycle Bin)	削除 (ごみ箱へ)
 s	秒
 What for (or ‘3pm meeting’)	内容 (または ‘3pm meeting’)
@@ -2050,3 +2057,33 @@ just now	たった今
 Detach from the launcher	ランチャーから切り離す
 Always on top	常に手前に表示
 Attach to the launcher	ランチャーに付ける
+Markdown document	Markdown 文書
+Bloom's document window to read and edit Markdown (.md) files	Markdown (.md) ファイルを表示・編集する Bloom のドキュメントウィンドウ
+View in Bloom	Bloom で表示
+Couldn't open the file	ファイルを開けませんでした
+Has characters this file can't hold	このファイルに保存できない文字があります
+No permission to change this file	このファイルを変更する権限がありません
+The file is read-only	読み取り専用のファイルです
+Not UTF-8, so it can't be edited	UTF-8 ではないため編集できません
+Has unreadable characters, so it can't be edited	読み取れない文字があるため編集できません
+Over 10 MB · only its start, as plain text	10 MB を超えるため先頭だけをテキストで表示
+Markdown documents (.md)	Markdown 文書 (.md)
+Bloom in Explorer's ‘Open with’ · ‘View in Bloom’ on .md files you find	エクスプローラーの「プログラムから開く」に Bloom · 検索した .md ファイルの「Bloom で表示」
+Reload	再読み込み
+Save mine	自分の内容を保存
+Not saved · another program is using the file, trying again	未保存 · 別のプログラムがファイルを使用中のため、もう一度保存します
+Not saved	未保存
+The file was deleted or moved · the text is still here	ファイルが削除または移動されました · テキストはここに残っています
+Another program changed this file	別のプログラムがこのファイルを変更しました
+View only	表示のみ
+Unsaved changes	保存されていない変更
+What you changed isn't in the file yet. Saving yours puts this text in the file.	変更した内容はまだファイルに保存されていません。自分の内容を保存すると、ファイルがこのテキストになります。
+Don't save	保存しない
+‘{0}’ isn't there	「{0}」が見つかりません
+Make it the default app	既定のアプリにする
+Pick Bloom for .md files in Windows Settings, and a double-click in Explorer opens them in Bloom's document window	Windows の設定で .md ファイルを開くアプリに Bloom を選ぶと、エクスプローラーでダブルクリックしたときに Bloom のドキュメントウィンドウで開きます
+Bloom recovery	Bloom 復元
+Bloom couldn't open the file	Bloom でファイルを開けませんでした
+The file isn't there, or it can't be opened	ファイルが見つからないか、開けないファイルです
+The running Bloom didn't answer	実行中の Bloom から応答がありませんでした
+Bloom wasn't ready within 30 seconds	Bloom が 30 秒以内に準備できませんでした

@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 namespace Bloom.Core;
@@ -104,6 +105,18 @@ internal static class Hangul
         return sb?.ToString() ?? s;
     }
 
-    /// KeepAll undone: shown text back to what was written (a selection copied from a conversation).
-    public static string Unjoin(string s) => s.Replace(Joiner.ToString(), "", System.StringComparison.Ordinal);
+    /// What Ui\Markdown.cs draws inline code with: its padding, a space no line break comes off (FIGURE SPACE), and after
+    /// . / \ _ - in it a chance to break a long one there (ZERO WIDTH SPACE). Display only, as KeepAll's joiners.
+    public const char CodePad = '\u2007', BreakHint = '\u200B';
+
+    /// The display-only characters undone: shown text back to what was written (a selection copied from the screen) —
+    /// KeepAll's joiners and code's break chances out, code's padding back to the spaces it was.
+    public static string Unjoin(string s)
+    {
+        if (s.AsSpan().IndexOfAny(Joiner, BreakHint, CodePad) < 0) return s;
+        var sb = new StringBuilder(s.Length);
+        foreach (char c in s)
+            if (c is not Joiner and not BreakHint) sb.Append(c == CodePad ? ' ' : c);
+        return sb.ToString();
+    }
 }

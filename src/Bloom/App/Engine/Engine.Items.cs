@@ -180,7 +180,7 @@ internal sealed partial class Engine
         item.Run = () =>
         {
             Usage.Touch(id);
-            Launch.Open(path);
+            host.OpenFile(path); // a .md one in Bloom's document window when Bloom is Windows' app for it
         };
         if (ext is ".exe" or ".bat" or ".cmd" or ".msi" or ".lnk")
             item.Side = new ActionItem { Title = Tr("관리자 권한으로 실행", "Run as administrator"), Keys = "Ctrl+Shift+Enter", Glyph = G.Shield, Run = () => Launch.RunAsAdmin(path) };
@@ -193,6 +193,8 @@ internal sealed partial class Engine
             };
             if (folder) list.Add(new ActionItem { Title = Tr("이 폴더 크기 보기 (Space Cleaner)", "See this folder's size (Space Cleaner)"), Glyph = G.Folder, Run = () => host.OpenSpace(path) });
             if (item.Side is { } admin) list.Insert(1, admin);
+            if (!folder && DocFile.IsMarkdown(path) && Features.On("docs"))
+                list.Insert(0, new ActionItem { Title = Tr("Bloom으로 보기", "View in Bloom"), Glyph = G.Page, Run = () => { Usage.Touch(id); host.OpenDoc(path); } });
             list.AddRange(FileActions(path, name, folder));
             if (ext is ".ps1" or ".bat" or ".cmd" or ".exe")
                 list.Add(new ActionItem { Title = Tr("사용자 명령에 추가…", "Add to custom commands…"), Glyph = G.Bolt, StayOpen = true, Run = () => host.Window.StartForm(CommandForm("script", null, path.Contains(' ') ? $"\"{path}\"" : path)) });

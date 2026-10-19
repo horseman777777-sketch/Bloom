@@ -87,6 +87,7 @@ internal sealed partial class Host
             (Tr("설정 내보내기", "Export settings"), MessageBoxResult.Yes), (Tr("백업 없이 초기화", "Reset without backup"), MessageBoxResult.No), (Tr("취소", "Cancel"), MessageBoxResult.Cancel));
         if (first == MessageBoxResult.Cancel) return false;
         if (first == MessageBoxResult.Yes && !ExportSettings(owner)) return false;
+        if (!DocWindow.SettleAll()) return false; // a document's edits not in its file yet: asked before anything starts
         if (!StartSuccessor("--reset-from"))
         {
             Tell(owner, Tr("초기화 실패", "Reset failed"), Tr("Bloom을 다시 시작하지 못했습니다. 삭제된 데이터는 없습니다. Bloom을 다시 열고 시도하세요.", "Could not restart Bloom. No data was deleted. Reopen Bloom and try again."));
@@ -114,12 +115,14 @@ internal sealed partial class Host
             (Tr("데이터 유지", "Keep data"), MessageBoxResult.No), (Tr("데이터 삭제", "Delete data"), MessageBoxResult.Yes), (Tr("취소", "Cancel"), MessageBoxResult.Cancel));
         if (data == MessageBoxResult.Cancel) return false;
         bool wipe = data == MessageBoxResult.Yes;
+        if (!DocWindow.SettleAll()) return false; // a document's edits not in its file yet: asked before anything starts
         if (!StartSuccessor("--uninstall-from", wipe ? new[] { "--wipe" } : Array.Empty<string>()))
         {
             Tell(owner, Tr("삭제 실패", "Uninstall failed"), Tr("Bloom을 다시 시작하지 못했습니다. 삭제된 데이터는 없습니다. Bloom을 다시 열고 시도하세요.", "Could not restart Bloom. No data was deleted. Reopen Bloom and try again."));
             return false;
         }
         Autostart.Set(false);
+        FileAssoc.Set(false); // a copy without the setup has no uninstaller to do it (Program: the setup's own step)
         if (!installed) Launch.Open("explorer.exe", $"/select,\"{Environment.ProcessPath}\"");
         Log.Write("uninstall: quitting" + (wipe ? ", the data goes too" : ""));
         Quit(save: !wipe);
@@ -156,6 +159,7 @@ internal sealed partial class Host
     /// A new language (and anything else read once per run) takes effect in a fresh Bloom; `then` = --settings / --show.
     public void Restart(string? then = null)
     {
+        if (!DocWindow.SettleAll()) return; // 취소 on a document's unwritten edits: no restart
         SaveAll();
         if (!StartSuccessor("--restart-from", then is null ? Array.Empty<string>() : new[] { then })) return;
         Log.Write("restart");
@@ -176,6 +180,7 @@ internal sealed partial class Host
         Settings.Current.Onboarded = true;
         Settings.Save();
         if (!Paths.IsDev) Autostart.Set(Settings.Current.Autostart);
+        FileAssoc.Repair(); // the 마크다운 문서 switch brought in
         Theme.Apply(Settings.Current.Theme);
         ApplyHotkeys();
         AppsChanged();
