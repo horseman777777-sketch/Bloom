@@ -12,6 +12,9 @@ Each release on GitHub shows its section from this file (the workflow looks for 
 - Links in notes and documents open only web pages (http, https) and e-mail (mailto); a link to a file on this PC shows it in its folder. Pictures in network folders are not loaded, so Windows doesn't hand your sign-in to them, unless the document is in that network folder itself.
 - AI accounts: an added account can be signed out with its × or "Sign out" in its menu, after a confirmation. Bloom runs the CLI's own sign-out (for ChatGPT, after stopping Bloom's Codex for it), then moves the account's folder to the Recycle Bin; AI chat goes back to the default account.
 - Glass transparency: Settings › Performance › Display sets how much of the screen behind shows through the glass (15–75 %, 30 % by default).
+- The "update downloaded" card has "Restart to update", which puts the update in right away (#2).
+- Security: in custom commands, what `{input}` and `{clipboard}` put into a script is always taken as text and never run as a command, whatever quotes the script puts around it; the winget "install in a terminal" line quotes the package's Id and source too. Thanks to @horseman777777-sketch (#5).
+- Fixed: Bloom Lens and the color picker covered only part of a monitor whose scale differs from the main one (a 100 % monitor beside a 150 % one). Thanks to @horseman777777-sketch (#4).
 - Fixed: a black console window could pop up for a moment when Bloom stalled, for example while opening a long .md file. Bloom no longer writes diagnostic files for stalls; its log still notes each one in a line, and the old files in `%LOCALAPPDATA%\Bloom\stalls` are deleted.
 
 ### 한국어
@@ -24,6 +27,9 @@ Each release on GitHub shows its section from this file (the workflow looks for 
 - 메모와 문서의 링크는 웹 페이지(http, https)와 메일(mailto)만 열고, PC 안 파일 링크는 폴더에서 해당 파일을 표시합니다. 네트워크 폴더의 그림은 Windows 로그인 정보가 그쪽으로 전달되지 않도록 불러오지 않습니다. 문서가 그 네트워크 폴더 안에 있을 때만 불러옵니다.
 - AI 계정: 추가한 계정은 ×나 메뉴의 '로그아웃'으로, 확인을 거쳐 로그아웃할 수 있습니다. CLI의 공식 로그아웃을 실행한 뒤(ChatGPT는 그 계정의 Bloom Codex를 먼저 멈춤) 계정 폴더를 휴지통으로 옮기고, AI 채팅은 기본 계정으로 돌아갑니다.
 - 유리 투명도: 설정 › 성능 › 화면에서 유리 너머로 뒤 화면이 비치는 정도를 고릅니다(15~75%, 기본 30%).
+- '다운로드 완료' 업데이트 카드에 '다시 시작해서 업데이트' 버튼이 생겼습니다. 누르면 바로 업데이트를 적용합니다(#2).
+- 보안: 사용자 명령에서 `{input}`과 `{clipboard}`로 스크립트에 들어가는 값은 스크립트가 어떤 따옴표를 두르든 항상 글자로만 다루고 명령으로 실행하지 않습니다. winget '터미널에서 설치' 줄의 패키지 Id와 소스도 따옴표로 감쌉니다. @horseman777777-sketch 님 감사합니다(#5).
+- 수정: 배율이 주 모니터와 다른 모니터에서 Bloom Lens와 색 고르기가 화면 일부만 덮던 문제(150% 옆의 100% 모니터 등)를 고쳤습니다. @horseman777777-sketch 님 감사합니다(#4).
 - 수정: Bloom이 잠깐 멈출 때(예: 긴 .md 파일을 열 때) 검은 콘솔 창이 잠깐 뜨던 문제를 고쳤습니다. 멈춤 진단 파일은 더 이상 만들지 않고 로그에 한 줄로만 남기며, `%LOCALAPPDATA%\Bloom\stalls`의 예전 파일은 지웁니다.
 
 ## 0.14.1

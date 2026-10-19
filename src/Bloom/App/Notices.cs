@@ -24,6 +24,7 @@ internal sealed record Notice(string Kind, string Head, string Title, string? De
 internal static class Notices
 {
     public static Action? OpenUpdates { get; set; }
+    public static Action? UpdateNow { get; set; } // Host.UpdateNow: saved, then the downloaded update goes in
     // 진행 중 waits a moment (quick turns stay quiet; a program's run — a tool checking something — longer), and
     // 작업 완료 needs a turn that took a while
     private static readonly TimeSpan StartDelay = TimeSpan.FromSeconds(4), HeadlessStartDelay = TimeSpan.FromSeconds(15), ShortestDone = TimeSpan.FromSeconds(10);
@@ -219,9 +220,16 @@ internal static class Notices
     /// or copied): shown whether or not 작업 알림 is on, as it answers the user's own action.
     public static void Result(bool ok, string head, string title, string? detail, string? actionText = null, Action? action = null) => Show(new Notice(ok ? "done" : "limit", head, title, detail, ActionText: actionText, Action: action));
 
-    /// A new Bloom is downloaded (Updates): it goes in at the next start; a card without a sound.
-    public static void UpdateReady(string version) => Show(new Notice("done", Tr("Bloom · 업데이트", "Bloom · Update"), Tr($"새 버전 {version} 다운로드 완료", $"Version {version} downloaded"),
-        Tr("다음 실행 시 적용", "Applies at next start"), ActionText: Tr("업데이트 설정", "Update settings"), Action: OpenUpdates), sound: false);
+    /// A new Bloom is downloaded (Updates): it goes in at the next start, or now with 다시 시작해서 업데이트 (the same as
+    /// 설정 > 정보's); a card without a sound.
+    public static void UpdateReady(string version)
+    {
+        var choices = new List<(string Text, Action Run)>();
+        if (UpdateNow is { } now) choices.Add((Tr("다시 시작해서 업데이트", "Restart to update"), now));
+        if (OpenUpdates is { } open) choices.Add((Tr("업데이트 설정", "Update settings"), open));
+        Show(new Notice("done", Tr("Bloom · 업데이트", "Bloom · Update"), Tr($"새 버전 {version} 다운로드 완료", $"Version {version} downloaded"),
+            Tr("다음 실행 시 적용", "Applies at next start"), Buttons: choices), sound: false);
+    }
 
     /// A Bloom chat's AI waits for a yes or no while no Bloom window is in front.
     public static void Ask(string what, Action? action = null) => Show(new Notice("waiting", Tr("Bloom AI · 승인 대기", "Bloom AI · Approval pending"), what, Tr("허용 또는 거절을 선택하세요", "Choose Allow or Decline"), ActionText: Tr("AI 채팅 열기", "Open AI chat"), Action: action));
