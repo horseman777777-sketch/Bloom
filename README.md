@@ -226,7 +226,7 @@ The empty search line shows the home: favorites, AI usage, this week, timers, re
 
 | Keys | What it does |
 | --- | --- |
-| `Win` · `Alt+Space` | Open Bloom |
+| `Win` · `Alt+Space` | Open Bloom (`Win` over apps run as administrator: Settings › General › Win key over admin apps) |
 | `Tab` / `Shift+Tab` | Ask AI what's in the search line / in a new chat |
 | `Ctrl+K` | Everything you can do with the picked result |
 | `Ctrl+1` … `Ctrl+9` | Favorites |
@@ -286,7 +286,7 @@ Bloom is an unofficial personal project, not affiliated with Anthropic, OpenAI, 
 
 ## Install · build
 
-To use Bloom, take the setup file from [Download](#download). To build it yourself you need Windows 10/11 and the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+To use Bloom, take the setup file from [Download](#download). To build it yourself you need Windows 10/11 and the [.NET 10 SDK](https://dotnet.microsoft.com/download); `tools\package.ps1` also needs the C++ build tools (Visual Studio's "Desktop development with C++") for the Win-key helper.
 
 ```powershell
 dotnet build src\Bloom\Bloom.csproj -c Release
@@ -310,7 +310,7 @@ Under `src/Bloom`, one folder is one feature. Big classes are split into `partia
 
 | Folder | What's in it |
 | --- | --- |
-| `App/` | `Host` (wires the whole app: start · shortcuts · commands · Lens · timers/colors · running custom commands · file actions), work notifications (`Notices`), updates from GitHub Releases (`Updates`, Velopack), the MCP server (`Mcp/` — relay · server · the `pc` tool), run options, tray, the Win key hook |
+| `App/` | `Host` (wires the whole app: start · shortcuts · commands · Lens · timers/colors · running custom commands · file actions), work notifications (`Notices`), updates from GitHub Releases (`Updates`, Velopack), the MCP server (`Mcp/` — relay · server · the `pc` tool), run options, tray, the Win key hook (and its elevated helper for apps run as administrator: `src/WinKeyHelper`, NativeAOT) |
 | `App/Engine/` | Making what the search line shows — root search, home blocks, item conversion, per view (files · clipboard · calendar · timers · colors …) |
 | `App/Qa/` | Off-screen capture QA (`--capture <folder> --qa-set v15 --data <folder> --lang en`) |
 | `Core/` | What is saved (settings · favorites · usage · learning per typed text · timers · notes · colors) and JSON storage, Korean search, matching, the interface language (`Lang` — `Tr("한국어", "English")`) |

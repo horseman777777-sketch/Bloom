@@ -226,7 +226,7 @@ irm https://raw.githubusercontent.com/hyeon1035298/Bloom/main/install.ps1 | iex
 
 | 按键 | 作用 |
 | --- | --- |
-| `Win` · `Alt+Space` | 打开 Bloom |
+| `Win` · `Alt+Space` | 打开 Bloom（在以管理员身份运行的应用上按 `Win`：设置 › 常规 › 在管理员应用上也使用 Win 键） |
 | `Tab` / `Shift+Tab` | 把搜索栏中的内容问 AI / 在新对话中问 |
 | `Ctrl+K` | 所选结果可执行的所有操作 |
 | `Ctrl+1` … `Ctrl+9` | 收藏 |
@@ -286,7 +286,7 @@ Bloom 是非官方的个人项目，与 Anthropic、OpenAI、voidtools 和 Rayca
 
 ## 安装 · 构建
 
-只想使用的话，请从[下载](#下载)获取安装程序。自行构建需要 Windows 10/11 和 [.NET 10 SDK](https://dotnet.microsoft.com/download)。
+只想使用的话，请从[下载](#下载)获取安装程序。自行构建需要 Windows 10/11 和 [.NET 10 SDK](https://dotnet.microsoft.com/download)。`tools\package.ps1` 还需要 C++ 生成工具（Visual Studio 的“使用 C++ 的桌面开发”），用于 Win 键助手。
 
 ```powershell
 dotnet build src\Bloom\Bloom.csproj -c Release
@@ -310,7 +310,7 @@ powershell -File tools\install.ps1   # → %LOCALAPPDATA%\Programs\Bloom，开�
 
 | 文件夹 | 内容 |
 | --- | --- |
-| `App/` | `Host`（整个应用的连接：启动 · 快捷键 · 命令 · Lens · 计时器和颜色 · 运行自定义命令 · 文件操作）、工作通知（`Notices`）、从 GitHub Releases 更新（`Updates`，Velopack）、MCP 服务器（`Mcp/` — 中继 · 服务器 · `pc` 工具）、启动选项、托盘、Win 键钩子 |
+| `App/` | `Host`（整个应用的连接：启动 · 快捷键 · 命令 · Lens · 计时器和颜色 · 运行自定义命令 · 文件操作）、工作通知（`Notices`）、从 GitHub Releases 更新（`Updates`，Velopack）、MCP 服务器（`Mcp/` — 中继 · 服务器 · `pc` 工具）、启动选项、托盘、Win 键钩子（管理员应用的助手：`src/WinKeyHelper`，NativeAOT） |
 | `App/Engine/` | 生成搜索栏显示的内容 — 根搜索、主页区块、项目转换，以及各视图（文件 · 剪贴板 · 日历 · 计时器 · 颜色等） |
 | `App/Qa/` | 屏幕外截图 QA（`--capture <文件夹> --qa-set v15 --data <文件夹> --lang en`） |
 | `Core/` | 保存的数据（设置 · 收藏 · 使用记录 · 按输入的学习 · 计时器 · 笔记 · 颜色）和 JSON 存储、韩语搜索、匹配、界面语言（`Lang` — `Tr("한국어", "English")`） |

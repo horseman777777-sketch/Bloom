@@ -225,7 +225,7 @@ irm https://raw.githubusercontent.com/hyeon1035298/Bloom/main/install.ps1 | iex
 
 | 키 | 하는 일 |
 | --- | --- |
-| `Win` · `Alt+Space` | Bloom 열기 |
+| `Win` · `Alt+Space` | Bloom 열기 (관리자 권한 앱 위에서 `Win`: 설정 › 일반 › 관리자 앱 위에서도 Win 키 사용) |
 | `Tab` / `Shift+Tab` | 검색창의 글자로 AI에게 묻기 / 새 대화로 묻기 |
 | `Ctrl+K` | 고른 결과로 할 수 있는 일 |
 | `Ctrl+1` … `Ctrl+9` | 즐겨찾기 |
@@ -285,7 +285,7 @@ Bloom은 Anthropic · OpenAI · voidtools · Raycast와 관련 없는 비공식 
 
 ## 설치 · 빌드
 
-Bloom을 사용하려면 [다운로드](#다운로드)에서 설치 파일을 받으세요. 직접 빌드하려면 Windows 10/11과 [.NET 10 SDK](https://dotnet.microsoft.com/download)가 필요합니다.
+Bloom을 사용하려면 [다운로드](#다운로드)에서 설치 파일을 받으세요. 직접 빌드하려면 Windows 10/11과 [.NET 10 SDK](https://dotnet.microsoft.com/download)가 필요합니다. `tools\package.ps1`은 Win 키 도우미 때문에 C++ 빌드 도구(Visual Studio의 'C++를 사용한 데스크톱 개발')도 필요합니다.
 
 ```powershell
 dotnet build src\Bloom\Bloom.csproj -c Release
@@ -309,7 +309,7 @@ powershell -File tools\install.ps1   # → %LOCALAPPDATA%\Programs\Bloom, 시작
 
 | 폴더 | 내용 |
 | --- | --- |
-| `App/` | `Host`(앱 전체의 연결: 시작 · 단축키 · 명령 · Lens · 타이머/컬러 · 사용자 명령 실행 · 파일 동작), 작업 알림(`Notices`), GitHub 릴리즈 업데이트(`Updates`, Velopack), MCP 서버(`Mcp/` — 중계 · 서버 · `pc` 도구), 실행 옵션, 트레이, Win 키 훅 |
+| `App/` | `Host`(앱 전체의 연결: 시작 · 단축키 · 명령 · Lens · 타이머/컬러 · 사용자 명령 실행 · 파일 동작), 작업 알림(`Notices`), GitHub 릴리즈 업데이트(`Updates`, Velopack), MCP 서버(`Mcp/` — 중계 · 서버 · `pc` 도구), 실행 옵션, 트레이, Win 키 훅(관리자 권한 앱용 도우미: `src/WinKeyHelper`, NativeAOT) |
 | `App/Engine/` | 검색창에 보일 결과 만들기 — 루트 검색, 홈 블록, 항목 변환, 보기별(파일 · 클립보드 · 캘린더 · 타이머 · 색 …) |
 | `App/Qa/` | 화면 밖 캡처 QA (`--capture <폴더> --qa-set v15 --data <폴더> --lang en`) |
 | `Core/` | 저장되는 것(설정 · 즐겨찾기 · 사용 기록 · 입력어 학습 · 타이머 · 메모 · 색)과 JSON 저장, 한글 검색, 매칭, 화면 언어(`Lang` — `Tr("한국어", "English")`) |

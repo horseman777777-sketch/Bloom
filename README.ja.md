@@ -226,7 +226,7 @@ irm https://raw.githubusercontent.com/hyeon1035298/Bloom/main/install.ps1 | iex
 
 | キー | 内容 |
 | --- | --- |
-| `Win` · `Alt+Space` | Bloom を開く |
+| `Win` · `Alt+Space` | Bloom を開く (管理者として実行したアプリの上での `Win`: 設定 › 一般 › 管理者アプリの上でも Win キーを使用) |
 | `Tab` / `Shift+Tab` | 検索欄の内容を AI に聞く / 新しいチャットで聞く |
 | `Ctrl+K` | 選んだ結果でできる操作 |
 | `Ctrl+1` … `Ctrl+9` | お気に入り |
@@ -286,7 +286,7 @@ Bloom は非公式の個人プロジェクトで、Anthropic、OpenAI、voidtool
 
 ## インストール · ビルド
 
-使うだけならセットアップを [ダウンロード](#ダウンロード) から入手してください。自分でビルドするには Windows 10/11 と [.NET 10 SDK](https://dotnet.microsoft.com/download) が必要です。
+使うだけならセットアップを [ダウンロード](#ダウンロード) から入手してください。自分でビルドするには Windows 10/11 と [.NET 10 SDK](https://dotnet.microsoft.com/download) が必要です。`tools\package.ps1` には、Win キー ヘルパーのために C++ ビルド ツール (Visual Studio の「C++ によるデスクトップ開発」) も必要です。
 
 ```powershell
 dotnet build src\Bloom\Bloom.csproj -c Release
@@ -310,7 +310,7 @@ powershell -File tools\install.ps1   # → %LOCALAPPDATA%\Programs\Bloom、ス�
 
 | フォルダー | 内容 |
 | --- | --- |
-| `App/` | `Host` (アプリ全体の配線: 起動 · ショートカット · コマンド · Lens · タイマーと色 · カスタムコマンドの実行 · ファイル操作)、作業の通知 (`Notices`)、GitHub Releases からの更新 (`Updates`、Velopack)、MCP サーバー (`Mcp/` — 中継 · サーバー · `pc` ツール)、起動オプション、トレイ、Win キーのフック |
+| `App/` | `Host` (アプリ全体の配線: 起動 · ショートカット · コマンド · Lens · タイマーと色 · カスタムコマンドの実行 · ファイル操作)、作業の通知 (`Notices`)、GitHub Releases からの更新 (`Updates`、Velopack)、MCP サーバー (`Mcp/` — 中継 · サーバー · `pc` ツール)、起動オプション、トレイ、Win キーのフック (管理者アプリ用のヘルパー: `src/WinKeyHelper`、NativeAOT) |
 | `App/Engine/` | 検索欄に表示するものの作成 — ルート検索、ホームのブロック、項目の変換、ビューごと (ファイル · クリップボード · カレンダー · タイマー · 色など) |
 | `App/Qa/` | 画面外でのキャプチャ QA (`--capture <フォルダー> --qa-set v15 --data <フォルダー> --lang en`) |
 | `Core/` | 保存するもの (設定 · お気に入り · 使用履歴 · 入力ごとの学習 · タイマー · メモ · 色) と JSON の保存、韓国語の検索、照合、表示言語 (`Lang` — `Tr("한국어", "English")`) |
