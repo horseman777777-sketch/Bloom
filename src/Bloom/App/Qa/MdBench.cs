@@ -29,8 +29,8 @@ internal static class MdBench
 
     private sealed class Round
     {
-        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs, SliceMaxMs;
-        public int ScrollSteps, Stalls50, Stalls100;
+        public double OpenMs, SettleMs, OpenGapMs, ScrollP95, ScrollMax, FrameP95, FrameMax, ResizeP95, ResizeMax, SizeSettleMs, SizeGapMs, TickMs, TickGapMs, OutsideMs, OutsideGapMs, MaxGapMs, SliceMaxMs, SizeDrawnMs, OutsideDrawnMs, JumpMax, ScrollGapMs, ResizeGapMs, CloseGapMs, GcPauseMs;
+        public int ScrollSteps, Stalls50, Stalls100, Gen2;
         public bool SweptAll;
     }
 
@@ -83,14 +83,22 @@ internal static class MdBench
                 Line(text, "scroll step UI max ms", results, x => x.ScrollMax);
                 Line(text, "scroll Rendering interval p95 ms", results, x => x.FrameP95);
                 Line(text, "scroll Rendering interval max ms", results, x => x.FrameMax);
+                Line(text, "scroll jump (middle, end, 30 %) UI max ms", results, x => x.JumpMax);
                 Line(text, "resize step UI p95 ms", results, x => x.ResizeP95);
                 Line(text, "resize step UI max ms", results, x => x.ResizeMax);
                 Line(text, "text size: settle − 120 ms debounce", results, x => x.SizeSettleMs);
                 Line(text, "text size: longest UI gap ms", results, x => x.SizeGapMs);
+                Line(text, "text size: redraw (Show → drawn) ms", results, x => x.SizeDrawnMs);
                 Line(text, "checkbox tick settle ms", results, x => x.TickMs);
                 Line(text, "checkbox tick longest UI gap ms", results, x => x.TickGapMs);
                 Line(text, "outside edit settle ms", results, x => x.OutsideMs);
                 Line(text, "outside edit longest UI gap ms", results, x => x.OutsideGapMs);
+                Line(text, "outside edit redraw (Show → drawn) ms", results, x => x.OutsideDrawnMs);
+                Line(text, "scroll + jumps: longest UI gap ms", results, x => x.ScrollGapMs);
+                Line(text, "resize: longest UI gap ms", results, x => x.ResizeGapMs);
+                Line(text, "closing the window: longest UI gap ms", results, x => x.CloseGapMs);
+                Line(text, "GC pause after open, total ms", results, x => x.GcPauseMs);
+                Line(text, "gen2 collections after open", results, x => x.Gen2);
                 Line(text, "longest UI gap overall ms", results, x => x.MaxGapMs);
                 Line(text, "longest idle layout slice ms", results, x => x.SliceMaxMs);
                 Line(text, "stalls ≥ 50 ms (count)", results, x => x.Stalls50);
@@ -221,6 +229,9 @@ internal static class MdBench
         await Task.Delay(300);
 
         // scroll: top → bottom, a step a frame
+        double gc0 = GC.GetTotalPauseDuration().TotalMilliseconds;
+        int gen2 = GC.CollectionCount(2);
+        mark = probe.Mark();
         var steps = new List<double>();
         var frames = new List<double>();
         double prev = await Frame(watch);
@@ -244,10 +255,20 @@ internal static class MdBench
         r.ScrollMax = steps.DefaultIfEmpty(0).Max();
         r.FrameP95 = Pct(frames, .95);
         r.FrameMax = frames.DefaultIfEmpty(0).Max();
-        view.ScrollTo(view.ScrollableHeight * 0.3);
+        // jumps (the scroll bar's thumb dragged far): the middle, the end, back to 30 %
+        foreach (double share in new[] { 0.5, 1.0, 0.3 })
+        {
+            await Frame(watch);
+            var sw = Stopwatch.StartNew();
+            view.ScrollTo(view.ScrollableHeight * share);
+            view.UpdateLayout();
+            r.JumpMax = Math.Max(r.JumpMax, sw.Elapsed.TotalMilliseconds);
+        }
         await Idle();
+        r.ScrollGapMs = probe.Longest(mark);
 
         // resize: 600 → 1400 px wide, 20 px a frame
+        mark = probe.Mark();
         var sizes = new List<double>();
         for (double w = 600; w <= 1400; w += 20)
         {
@@ -261,6 +282,7 @@ internal static class MdBench
         r.ResizeMax = sizes.DefaultIfEmpty(0).Max();
         d.Width = 900;
         await Idle();
+        r.ResizeGapMs = probe.Longest(mark);
 
         // text size: one step up (MdPane redraws 120 ms after the last step)
         mark = probe.Mark();
@@ -270,6 +292,7 @@ internal static class MdBench
         await Idle();
         r.SizeSettleMs = watch.Elapsed.TotalMilliseconds - t0 - 120;
         r.SizeGapMs = probe.Longest(mark);
+        r.SizeDrawnMs = view.Surface.ShowToDrawnMs;
         pane.SetTextSize(Settings.MdTextDefault);
         await Task.Delay(200);
         await Idle();
@@ -294,11 +317,17 @@ internal static class MdBench
         await Idle();
         r.OutsideMs = watch.Elapsed.TotalMilliseconds - t0;
         r.OutsideGapMs = probe.Longest(mark);
+        r.OutsideDrawnMs = view.Surface.ShowToDrawnMs;
         await Task.Delay(300);
         r.SliceMaxMs = view.Surface.LongestSliceMs;
 
+        mark = probe.Mark();
         d.Close();
         await Idle();
+        await Task.Delay(100);
+        r.CloseGapMs = probe.Longest(mark);
+        r.GcPauseMs = GC.GetTotalPauseDuration().TotalMilliseconds - gc0;
+        r.Gen2 = GC.CollectionCount(2) - gen2;
         probe.Stop();
         var gaps = probe.Gaps;
         r.MaxGapMs = gaps.DefaultIfEmpty(0).Max();

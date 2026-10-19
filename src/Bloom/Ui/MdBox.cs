@@ -434,6 +434,14 @@ internal sealed class MdBox
         }
     }
 
+    /// Its lines as drawn let go (it went off screen).
+    public void Release()
+    {
+        foreach (var p in Parts) p.Text.Forget();
+        marker?.Forget();
+        foreach (var c in children) c.Release();
+    }
+
     /// Whether `inner` is one of the blocks in it (a quote's).
     public bool Contains(MdBox inner) => children.Any(c => c == inner || c.Contains(inner));
 
@@ -531,6 +539,20 @@ internal sealed class MdBox
             double rx = x - p.X + p.Text.X[s];
             for (int i = s; i < e; i++)
                 if (p.Text.X[i] <= rx && rx < p.Text.X[i + 1] && p.Text.LinkAt(i) is { } link) return (link, p);
+        }
+        return null;
+    }
+
+    /// The picture under (x, y), if any.
+    public MdPicture? PictureAt(double x, double y)
+    {
+        foreach (var p in Parts)
+        {
+            if (p.Text.Pictures.Length == 0 || y < p.Y || y >= p.Y + p.Height) continue;
+            int k = p.LineAt(y - p.Y);
+            double rx = x - p.X + p.Text.X[p.Starts[k]];
+            foreach (var (at, picture) in p.Text.Pictures)
+                if (at >= p.Starts[k] && at < p.End(k) && p.Text.X[at] <= rx && rx < p.Text.X[at] + picture.Width) return picture;
         }
         return null;
     }

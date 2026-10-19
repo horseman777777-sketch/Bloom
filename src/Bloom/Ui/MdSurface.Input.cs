@@ -197,8 +197,7 @@ internal sealed partial class MdSurface
     {
         base.OnMouseLeftButtonDown(e);
         StopDrag();
-        (Parent as UIElement ?? this).Focus();
-        if (ScrollOwner is { } owner) owner.Focus();
+        ScrollOwner?.Focus(); // the view: Ctrl+C, Shift+arrows
         var p = e.GetPosition(this);
         pressed = TargetAt(p);
         pressAt = p;
@@ -239,6 +238,12 @@ internal sealed partial class MdSurface
             PaintHover();
         }
         Cursor = target is not null ? Cursors.Hand : p.X >= left - 4 && p.X <= left + column + 4 ? Cursors.IBeam : Cursors.Arrow;
+        // a picture's alt text as its tooltip
+        string? alt = null;
+        double y = p.Y + offset;
+        int k = boxes.Count > 0 ? BlockAt(y) : -1;
+        if (k >= 0 && k < boxes.Count && boxes[k].Shaped && boxes[k].Width == column && boxes[k].PictureAt(p.X - left, y - tops[k]) is { Alt.Length: > 0 } picture) alt = picture.Alt;
+        if (!Equals(ToolTip, alt)) ToolTip = alt;
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)

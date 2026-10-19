@@ -33,18 +33,23 @@ internal readonly record struct MdSpotAt(int Block, int Part, int At) : ICompara
 /// block and pixels into it) is exact. Blocks are shaped when they come near the screen and the rest in slices of at
 /// most 8 ms while the UI thread is otherwise idle; a block not shaped yet has a guessed height, and when it becomes
 /// exact above the place on screen the offset moves with it, so what is on screen stays. Only what is near the screen is
-/// drawn: a DrawingVisual per block (per 1024 px of a tall one) within a screen above and below, recorded once and
-/// moved by a transform; the selection is drawn under them in a visual of its own, a hovered link's underline and a
-/// hovered box's ring over them.
+/// drawn: a DrawingVisual per block (per 320 px band of a tall one) — the screen's at once, a screen above and below
+/// while the UI thread is idle — recorded once and moved by a transform; the selection is drawn under them in a visual
+/// of its own, a hovered link's underline and a hovered box's ring over them.
 internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
 {
-    public const double ReadingEms = 54, Top = 12, Bottom = 14, SideLeft = 16, SideRight = 14, Band = 1024;
+    public const double ReadingEms = 54, Top = 12, Bottom = 14, SideLeft = 16, SideRight = 14, Band = 320;
     private const double SliceMs = 8;
 
     private readonly VisualCollection visuals;
     private readonly DrawingVisual selectionLayer = new(), hoverLayer = new();
     private readonly Dictionary<(MdBox Box, int Band), DrawingVisual> realized = [];
     private List<MdBox> boxes = [];
+    private readonly Dictionary<MdBox, int> indexOf = [];
+    private string? lastMd;
+    private bool lastDocument;
+    private string[] lastLines = [];
+    private List<MdBlock> lastBlocks = [];
     private double[] tops = []; // each block's top (its text, under its gap)
     private double extent;
     private MdEnv? env;
@@ -65,6 +70,11 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
 
     /// QA: the longest idle slice so far (ms).
     public double LongestSliceMs { get; private set; }
+
+    /// QA: from the last Show to the end of the layout that drew it (ms).
+    public double ShowToDrawnMs { get; private set; }
+
+    private readonly Stopwatch shown = new();
 
     public MdSurface()
     {
@@ -95,8 +105,17 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
     /// source didn't change keep their shaping and drawing.
     public void Show(string md, double size, bool document, string? baseDir)
     {
-        var lines = md.Replace("\r\n", "\n").Split('\n');
-        var blocks = MdParser.Parse(md, document, true);
+        shown.Restart();
+        // the same text again (another text size): read once
+        if (md != lastMd || document != lastDocument)
+        {
+            lastLines = md.Replace("\r\n", "\n").Split('\n');
+            lastBlocks = MdParser.Parse(md, document, true);
+            lastMd = md;
+            lastDocument = document;
+        }
+        var lines = lastLines;
+        var blocks = lastBlocks;
         bool same = env is not null && size == this.size && document == this.document && baseDir == this.baseDir;
         var pool = new Dictionary<string, Queue<MdBox>>();
         if (same)
@@ -122,6 +141,8 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
             else list.Add(new MdBox(b, key));
         }
         boxes = list;
+        indexOf.Clear();
+        for (int k = 0; k < list.Count; k++) indexOf[list[k]] = k;
         selA = selB = null;
         hover = null;
         pressed = null;
@@ -275,16 +296,22 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
         Realize();
         ScrollOwner?.InvalidateScrollInfo();
         Schedule();
+        if (shown.IsRunning && column > 0)
+        {
+            ShowToDrawnMs = shown.Elapsed.TotalMilliseconds;
+            shown.Reset();
+        }
         return final;
     }
 
-    /// The blocks on screen and half a screen around it shaped and laid out now (the offset kept as they become exact).
+    /// The blocks on screen shaped and laid out now (the offset kept as they become exact); the idle slices do those
+    /// around it next.
     private void Near()
     {
         if (boxes.Count == 0 || column <= 0) return;
         for (int round = 0; round < 6; round++)
         {
-            int from = BlockAt(Math.Max(0, offset - viewport.Height / 2)), to = BlockAt(offset + viewport.Height * 1.5);
+            int from = BlockAt(Math.Max(0, offset)), to = BlockAt(offset + viewport.Height);
             bool any = false;
             for (int k = from; k <= to; k++) any |= Ready(k);
             if (!any) return;
@@ -324,6 +351,9 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
         sliceWatch.Restart();
         int n = boxes.Count, looked = 0;
         bool changed = false;
+        // a screen above and below first (scrolling there finds them ready), then the rest
+        for (int k = BlockAt(Math.Max(0, offset - viewport.Height)); k < n && tops[k] < offset + viewport.Height * 2 && sliceWatch.Elapsed.TotalMilliseconds < SliceMs; k++)
+            changed |= Ready(k);
         if (scan >= n) scan = 0;
         while (looked < n && sliceWatch.Elapsed.TotalMilliseconds < SliceMs)
         {
@@ -370,47 +400,86 @@ internal sealed partial class MdSurface : FrameworkElement, IScrollInfo
     /// place; then the selection and the hover over them.
     private void Realize()
     {
-        var e = Env();
-        var keep = new HashSet<(MdBox, int)>();
         if (boxes.Count > 0 && column > 0)
         {
-            double from = offset - viewport.Height, to = offset + viewport.Height * 2;
-            for (int k = BlockAt(Math.Max(0, from)); k < boxes.Count && tops[k] < to; k++)
+            // what is on screen now; a screen above and below while the UI thread is idle (Widen)
+            bool all = Record(offset, offset + viewport.Height, double.PositiveInfinity);
+            if (!all || !Record(offset - viewport.Height, offset + viewport.Height * 2, 0)) Widen(later: true);
+            double from = offset - viewport.Height * 1.5, to = offset + viewport.Height * 2.5;
+            List<MdBox>? gone = null;
+            foreach (var key in realized.Keys.ToList())
             {
-                var b = boxes[k];
-                if (!b.Shaped || b.Width != column) continue;
-                int first = (int)Math.Max(0, Math.Floor((from - tops[k]) / Band)), last = (int)Math.Floor(Math.Max(0, Math.Min(b.Height, to - tops[k]) - 0.01) / Band);
-                for (int band = first; band <= last; band++)
+                var (box, band) = key;
+                int k = indexOf.TryGetValue(box, out int at) ? at : -1;
+                if (k < 0 || tops[k] + (band + 1) * Band < from || tops[k] + band * Band > to || !box.Shaped || box.Width != column)
                 {
-                    keep.Add((b, band));
-                    if (!realized.TryGetValue((b, band), out var v))
-                    {
-                        Decode(b);
-                        v = new DrawingVisual { Transform = new TranslateTransform() };
-                        using (var dc = v.RenderOpen())
-                        {
-                            double top = band * Band, bottom = Math.Min(b.Height, top + Band);
-                            bool clip = b.Height > Band;
-                            if (clip) dc.PushClip(new RectangleGeometry(new Rect(-SideLeft, top, column + SideLeft + SideRight, bottom - top)));
-                            b.Draw(dc, e, top, bottom);
-                            if (clip) dc.Pop();
-                        }
-                        realized[(b, band)] = v;
-                        visuals.Insert(visuals.Count - 1, v);
-                    }
-                    var t = (TranslateTransform)v.Transform;
-                    t.X = DeviceY(left);
-                    t.Y = DeviceY(tops[k]) - DeviceY(offset);
+                    visuals.Remove(realized[key]);
+                    realized.Remove(key);
+                    (gone ??= []).Add(box);
+                    continue;
                 }
+                var t = (TranslateTransform)realized[key].Transform;
+                t.X = DeviceY(left);
+                t.Y = DeviceY(tops[k]) - DeviceY(offset);
             }
+            // a block off screen lets go of its lines as drawn
+            if (gone is not null)
+                foreach (var box in gone.Distinct())
+                    if (!indexOf.ContainsKey(box) || !realized.Keys.Any(r => r.Box == box)) box.Release();
         }
-        foreach (var key in realized.Keys.Where(k => !keep.Contains(k)).ToList())
-        {
-            visuals.Remove(realized[key]);
-            realized.Remove(key);
-        }
+        else DropAll();
         PaintSelection();
         PaintHover();
+    }
+
+    private bool widenQueued;
+
+    /// The screen above and below recorded too, at most SliceMs at a time.
+    private void Widen(bool later)
+    {
+        if (later)
+        {
+            if (widenQueued) return;
+            widenQueued = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, () => Widen(false));
+            return;
+        }
+        widenQueued = false;
+        if (boxes.Count == 0 || column <= 0 || PresentationSource.FromVisual(this) is null) return;
+        if (!Record(offset - viewport.Height, offset + viewport.Height * 2, SliceMs)) Widen(later: true);
+        else InvalidateArrange(); // placed by the next arrange
+    }
+
+    /// The bands of the shaped blocks between `from` and `to` recorded (those not yet), until `budget` ms have gone (0:
+    /// none recorded, only whether all are); true when all are.
+    private bool Record(double from, double to, double budget)
+    {
+        var e = Env();
+        var watch = budget > 0 && !double.IsPositiveInfinity(budget) ? System.Diagnostics.Stopwatch.StartNew() : null;
+        for (int k = BlockAt(Math.Max(0, from)); k < boxes.Count && tops[k] < to; k++)
+        {
+            var b = boxes[k];
+            if (!b.Shaped || b.Width != column) continue;
+            int first = (int)Math.Max(0, Math.Floor((from - tops[k]) / Band)), last = (int)Math.Floor(Math.Max(0, Math.Min(b.Height, to - tops[k]) - 0.01) / Band);
+            for (int band = first; band <= last; band++)
+            {
+                if (realized.ContainsKey((b, band))) continue;
+                if (budget <= 0 || watch is not null && watch.Elapsed.TotalMilliseconds > budget) return false;
+                Decode(b);
+                var v = new DrawingVisual { Transform = new TranslateTransform(DeviceY(left), DeviceY(tops[k]) - DeviceY(offset)) };
+                using (var dc = v.RenderOpen())
+                {
+                    double top = band * Band, bottom = Math.Min(b.Height, top + Band);
+                    bool clip = b.Height > Band;
+                    if (clip) dc.PushClip(new RectangleGeometry(new Rect(-SideLeft, top, column + SideLeft + SideRight, bottom - top)));
+                    b.Draw(dc, e, top, bottom);
+                    if (clip) dc.Pop();
+                }
+                realized[(b, band)] = v;
+                visuals.Insert(visuals.Count - 1, v);
+            }
+        }
+        return true;
     }
 
     /// A block's pictures decoded for the width they are drawn at (from the cache, or redrawn once decoded).

@@ -169,6 +169,7 @@ internal sealed class MdText
     public readonly (int Start, int End, string Copy)[] CopyAs; // what a span gives when copied whole (an autolink)
     public readonly (int At, MdPicture Picture)[] Pictures;
     private readonly bool codeTint;
+    private readonly MdRunProps look; // the text's own look (its lines' baseline goes by it)
     private int[]? objectsAt; // where the text has an object character, in order
     private MdObject?[]? objects;
 
@@ -177,10 +178,17 @@ internal sealed class MdText
     private bool[]? graphemes;
     public bool Shaped;
 
+    /// The pieces it was shaped in (a segment, or ~4,000 characters of a long one), each drawn once on one line when
+    /// first needed: a line on screen is its piece's drawing moved and clipped to it, so a new width formats nothing.
+    private readonly List<(int From, int To)> pieces = [];
+    private Drawing?[]? drawings;
+    private double[]? baselines;
+    private double drawnAt = -1; // the line height the drawings are for
+
     /// The widest segment (a table column's natural width adds these up).
     public double Widest;
 
-    public MdText(string text, int[] runStarts, MdRunProps[] runProps, (int, int, MdLink)[] links, (int, int)[] code, (int, int, string)[] copyAs, (int, MdPicture)[] pictures, bool codeTint = false)
+    public MdText(string text, int[] runStarts, MdRunProps[] runProps, (int, int, MdLink)[] links, (int, int)[] code, (int, int, string)[] copyAs, (int, MdPicture)[] pictures, bool codeTint = false, MdRunProps? look = null)
     {
         Text = text;
         this.runStarts = runStarts;
@@ -190,6 +198,7 @@ internal sealed class MdText
         CopyAs = copyAs;
         Pictures = pictures;
         this.codeTint = codeTint;
+        this.look = look ?? runProps[0];
     }
 
     /// The text of `spans` in a block's look: `size`, `weight` and `brush` for plain text; code in Mono at the metrics'
@@ -270,12 +279,13 @@ internal sealed class MdText
             }
             if (s.Copy is not null) copy.Add((at, sb.Length, s.Copy));
         }
+        var own = env.Props(Theme.Sans, weight, FontStyles.Normal, size, brush);
         if (starts.Count == 0)
         {
             starts.Add(0);
-            looks.Add(env.Props(Theme.Sans, weight, FontStyles.Normal, size, brush));
+            looks.Add(own);
         }
-        return new MdText(sb.ToString(), [.. starts], [.. looks], [.. links], [.. code], [.. copy], [.. pictures], codeTint: true);
+        return new MdText(sb.ToString(), [.. starts], [.. looks], [.. links], [.. code], [.. copy], [.. pictures], codeTint: true, look: own);
     }
 
     /// A code block's text: one look, lines at '\n', all of it breaking as code.
@@ -378,6 +388,8 @@ internal sealed class MdText
         Objects(env);
         Opportunities = LineBreaks.Opportunities(Text, Code);
         graphemes = null;
+        pieces.Clear();
+        Forget();
         int n = Text.Length;
         X = new float[n + 1];
         Widest = 0;
@@ -406,7 +418,33 @@ internal sealed class MdText
             Widest = Math.Max(Widest, x0);
             seg = segEnd + 1;
         }
+        Split();
         Shaped = true;
+    }
+
+    /// The pieces cut again to about DrawPiece characters each, where a line may break (else between clusters): a line
+    /// on screen draws only the few it lies in, not all of a long paragraph clipped.
+    private void Split()
+    {
+        const int DrawPiece = 120;
+        var shaped = pieces.ToArray();
+        pieces.Clear();
+        foreach (var (from, to) in shaped)
+        {
+            int start = from;
+            while (to - start > DrawPiece * 3 / 2)
+            {
+                int k = Array.BinarySearch(Opportunities, start + DrawPiece);
+                if (k < 0) k = ~k - 1;
+                int cut = k >= 0 && Opportunities[k] > start + DrawPiece / 2 ? Opportunities[k] : start + DrawPiece;
+                graphemes ??= LineBreaks.Graphemes(Text);
+                while (cut < to && !graphemes[cut]) cut++;
+                if (cut >= to) break;
+                pieces.Add((start, cut));
+                start = cut;
+            }
+            pieces.Add((start, to));
+        }
     }
 
     /// One unbroken line from `from` to `to`: each character's x from its glyphs' advances (a cluster's characters share
@@ -414,7 +452,7 @@ internal sealed class MdText
     private double ShapePiece(MdEnv env, Source source, int from, int to, double x0)
     {
         source.End = to;
-        var props = new MdParaProps(LookAt(from), 0);
+        var props = new MdParaProps(look, 0);
         int at = from;
         while (at < to)
         {
@@ -446,6 +484,7 @@ internal sealed class MdText
                 X[covered] = (float)x;
                 x += ObjectAt(covered) is { } o ? o.Format(0).Width : 0;
             }
+            if (done > at) pieces.Add((at, Math.Min(done, to)));
             x0 = x;
             if (done <= at) break;
             at = done;
@@ -543,25 +582,53 @@ internal sealed class MdText
     /// The line from `s` to `e` as TextFormatter lays it out on its own (tests: against the shaped x).
     internal double FormattedWidth(MdEnv env, int s, int e)
     {
-        using var line = env.Formatter.FormatLine(new Source(this) { End = e }, s, 1e6, new MdParaProps(LookAt(s), 0), null);
+        using var line = env.Formatter.FormatLine(new Source(this) { End = e }, s, 1e6, new MdParaProps(look, 0), null);
         return line.WidthIncludingTrailingWhitespace;
     }
 
-    /// Line `k` (from `s` to `e`) drawn with its top at `y`: inline code's tint under it, its pictures, then the text.
+    /// Its pieces as drawn let go (the text went off screen).
+    public void Forget()
+    {
+        drawings = null;
+        baselines = null;
+    }
+
+    /// Piece `k` drawn once, on one line `lineHeight` high with its top at 0 and its first character at 0.
+    private (Drawing Drawing, double Baseline) Piece(MdEnv env, int k, double lineHeight)
+    {
+        if (drawings is null || baselines is null || drawnAt != lineHeight)
+        {
+            drawings = new Drawing?[pieces.Count];
+            baselines = new double[pieces.Count];
+            drawnAt = lineHeight;
+        }
+        if (drawings[k] is { } done) return (done, baselines[k]);
+        var (from, to) = pieces[k];
+        using var line = env.Formatter.FormatLine(new Source(this) { End = to }, from, 1e6, new MdParaProps(look, lineHeight), null);
+        var g = new DrawingGroup();
+        using (var dc = g.Open()) line.Draw(dc, new Point(0, 0), InvertAxes.None);
+        drawings[k] = g;
+        baselines[k] = line.Baseline;
+        return (g, line.Baseline);
+    }
+
+    /// The line from `s` to `e` drawn with its top at (x, y), `height` high (`lineHeight` 0: the font's own): inline
+    /// code's tint under it, its pictures, then its text — the pieces it lies in, moved and clipped to it.
     public void DrawLine(DrawingContext dc, MdEnv env, int s, int e, double x, double y, double lineHeight, double height)
     {
-        var source = new Source(this) { End = e };
-        double dy = height - lineHeight; // a picture made the line taller: the text sits at its bottom
-        using var line = env.Formatter.FormatLine(source, s, 1e6, new MdParaProps(LookAt(s), lineHeight), null);
+        if (e <= s || pieces.Count == 0) return;
+        double dy = lineHeight > 0 ? height - lineHeight : 0; // a picture made the line taller: the text sits at its bottom
         double baseX = X[s];
+        int first = PieceAt(s);
+        double baseline = Piece(env, first, lineHeight).Baseline;
         if (codeTint)
             foreach (var (cs, ce) in Code)
             {
                 if (ce <= s || cs >= e || Text[cs] != LineBreaks.PadChar) continue; // an address: no tint
-                var look = LookAt(Math.Min(ce - 1, Math.Max(cs, s)));
-                var fam = look.Typeface.FontFamily;
-                double size = look.FontRenderingEmSize;
-                double top = y + dy + line.Baseline - fam.Baseline * size;
+                var at = LookAt(Math.Min(ce - 1, Math.Max(cs, s)));
+                var fam = at.Typeface.FontFamily;
+                double size = at.FontRenderingEmSize;
+                double top = y + dy + baseline - fam.Baseline * size;
                 double x1 = X[Math.Max(cs, s)] - baseX, x2 = X[Math.Min(ce, e)] - baseX;
                 dc.DrawRectangle(Theme.P.Code, null, new Rect(x + x1, top, Math.Max(0, x2 - x1), fam.LineSpacing * size));
             }
@@ -570,6 +637,30 @@ internal sealed class MdText
             if (at < s || at >= e || p.Bitmap is not { } bmp) continue;
             dc.DrawImage(bmp.Source, new Rect(x + X[at] - baseX, y + height - p.Height, p.Width, p.Height));
         }
-        line.Draw(dc, new Point(x, y + dy), InvertAxes.None);
+        for (int k = first; k < pieces.Count && pieces[k].From < e; k++)
+        {
+            var (from, to) = pieces[k];
+            if (to <= s) continue;
+            var (drawing, _) = Piece(env, k, lineHeight);
+            double left = x + X[Math.Max(s, from)] - baseX, right = x + X[Math.Min(e, to)] - baseX;
+            dc.PushClip(new RectangleGeometry(new Rect(left, y - height, Math.Max(0, right - left), height * 3)));
+            dc.PushTransform(new TranslateTransform(x - baseX + X[from], y + dy));
+            dc.DrawDrawing(drawing);
+            dc.Pop();
+            dc.Pop();
+        }
+    }
+
+    /// The piece the character at `i` was shaped in.
+    private int PieceAt(int i)
+    {
+        int lo = 0, hi = pieces.Count - 1;
+        while (lo < hi)
+        {
+            int mid = (lo + hi + 1) >> 1;
+            if (pieces[mid].From <= i) lo = mid;
+            else hi = mid - 1;
+        }
+        return lo;
     }
 }
