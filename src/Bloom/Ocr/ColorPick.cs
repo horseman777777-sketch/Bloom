@@ -159,6 +159,8 @@ internal static class ColorPick
             Glass.ToolWindow(w);
             Win32.SetWindowPos(h, Win32.HWND_TOPMOST, mon.X, mon.Y, mon.Width, mon.Height, Win32.SWP_NOACTIVATE);
         };
+        // a monitor with another scale: WPF resizes the window by the scale ratio on the move, so cover the monitor again
+        w.DpiChanged += (_, _) => Win32.SetWindowPos(new WindowInteropHelper(w).Handle, Win32.HWND_TOPMOST, mon.X, mon.Y, mon.Width, mon.Height, Win32.SWP_NOACTIVATE);
         w.Loaded += (_, _) =>
         {
             Win32.GetCursorPos(out var c);
