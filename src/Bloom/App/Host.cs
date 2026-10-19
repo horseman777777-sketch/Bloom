@@ -106,6 +106,11 @@ internal sealed partial class Host
             _ = ResponsivenessBench.Run(this, ui, responsive);
             return; // synthetic sources only: no watchers, clipboard listeners, provider polling or global hooks
         }
+        if (Opt.MdBenchFile is { } mdBench)
+        {
+            _ = MdBench.Run(this, mdBench, Opt.MdBenchIn, Opt.MdBenchRounds);
+            return; // documents only, as the responsiveness probe
+        }
         if (!Demo.On) _ = GptCatalog.RefreshAsync();
         _ = CodexAppHome.Sweep(); // a sign-in link a crash left in Bloom's Codex folders
         if (Opt.ChatFile is not null)

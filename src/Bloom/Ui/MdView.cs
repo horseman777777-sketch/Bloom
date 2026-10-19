@@ -126,6 +126,24 @@ internal sealed class MdView : ItemsControl, ISelectionOwner
     /// The space above each block (tests).
     internal IEnumerable<double> Gaps => items.Select(i => i.Above);
 
+    /// QA (MdBench): the first checklist box clicked.
+    internal bool TickForQa()
+    {
+        static IEnumerable<FrameworkElement> Spots(IEnumerable<Block> blocks)
+        {
+            foreach (var block in blocks)
+            {
+                if (block is Section s)
+                    foreach (var b in Spots(s.Blocks)) yield return b;
+                else if (block is Paragraph p && p.Inlines.FirstInline is InlineUIContainer { Child: Grid { Children: [Border, ..] } spot })
+                    yield return spot;
+            }
+        }
+        if (Spots(Blocks).FirstOrDefault() is not { } first) return false;
+        first.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = MouseLeftButtonUpEvent });
+        return true;
+    }
+
     /// `blocks` (Markdown.BlocksOf, at `size`) shown in place of what was; nothing stays selected.
     public void Show(List<Block> blocks, double size)
     {

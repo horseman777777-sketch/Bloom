@@ -110,6 +110,15 @@ internal static class Program
                 case "--qa-responsive" when i + 1 < args.Length:
                     opt.ResponsiveRounds = int.TryParse(args[++i], out int responsive) ? Math.Clamp(responsive, 1, 10) : 3;
                     break;
+                case "--qa-md" when i + 1 < args.Length:
+                    opt.MdBenchFile = args[++i];
+                    break;
+                case "--qa-md-in" when i + 1 < args.Length:
+                    opt.MdBenchIn = args[++i];
+                    break;
+                case "--qa-md-rounds" when i + 1 < args.Length:
+                    opt.MdBenchRounds = int.TryParse(args[++i], out int mdRounds) ? Math.Clamp(mdRounds, 1, 20) : 5;
+                    break;
                 case "--qa-space" when i + 1 < args.Length:
                     opt.SpaceDir = args[++i];
                     break;

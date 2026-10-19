@@ -24,6 +24,8 @@ internal sealed class Options
     public int? MeasureSeconds; // --qa-measure <s>: run as usual (notice cards off-screen, no sounds), write memory.txt, quit
     public int? SummonRounds; // --qa-summon <n>: n cold + warm openings timed (SummonBench), summon.txt, quit
     public int? ResponsiveRounds; // --qa-responsive <n>: isolated synthetic search/render/dispatcher measurement, then quit
+    public string? MdBenchFile, MdBenchIn; // --qa-md <out.txt> [--qa-md-in "label=path|…"]: the Markdown view timed (MdBench)
+    public int MdBenchRounds = 5; // --qa-md-rounds <n>
 }
 
 /// Owns the services and the window and carries out commands.

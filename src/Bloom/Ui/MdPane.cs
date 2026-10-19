@@ -298,6 +298,9 @@ internal sealed class MdPane : Grid, IComposerHost
     /// QA: the view scrolled to its end.
     internal void ScrollToEndForQa() => view.ScrollToEnd();
 
+    /// QA (MdBench): the first checklist box clicked; false: none took it.
+    internal bool TickForQa() => view.TickForQa();
+
     private void Flash(string text, int ms)
     {
         badgeText.Text = text;
