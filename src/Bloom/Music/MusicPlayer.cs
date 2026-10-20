@@ -551,7 +551,20 @@ internal static class MusicPlayer
 
     private static async Task<bool> JriverRun(PlayerOp op, string? file)
     {
+        int start = -1; // Play: the place the new song takes in Playing Now
+        if (op == PlayerOp.Play)
+        {
+            if (await JriverGet(b => Mcws.Url(b, "Playback/Info")) is not { } infoBody) return false;
+            var info = Mcws.ParseInfo(infoBody);
+            start = info.Tracks == 0 ? 0 : info.Index + 1;
+            if (info.Tracks == 0) op = PlayerOp.Add; // an empty list: it goes in, and is the first
+        }
         if (await JriverGet(b => Mcws.Request(b, op, file)) is not { } body) return false;
+        if (Mcws.Accepted(body) && start >= 0)
+        {
+            if (await JriverGet(b => Mcws.PlayByIndex(b, start)) is not { } playBody) return false;
+            body = playBody;
+        }
         if (Mcws.Accepted(body))
         {
             Via = "MCWS";

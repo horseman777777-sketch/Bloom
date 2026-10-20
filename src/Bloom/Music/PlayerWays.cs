@@ -122,20 +122,24 @@ internal static class Mcws
         _ => "Playback/PlayByFilename",
     };
 
-    /// The request for `op`: a file is played now (Play) or put at the end of what is queued (Add).
+    /// The request for `op`. A file goes into Playing Now (`Filenames`, `Location`): Add at the end, Play right after the
+    /// song that is on (`Next`; the caller then starts it with PlayByIndex). Playing Now is never replaced.
     public static string Request(string baseUrl, PlayerOp op, string? file = null) => op switch
     {
-        PlayerOp.Play => Url(baseUrl, Endpoint(op), ("Filename", file ?? "")),
-        PlayerOp.Add => Url(baseUrl, Endpoint(op), ("Filename", file ?? ""), ("Position", "End")),
+        PlayerOp.Play => Url(baseUrl, Endpoint(op), ("Filenames", file ?? ""), ("Location", "Next")),
+        PlayerOp.Add => Url(baseUrl, Endpoint(op), ("Filenames", file ?? ""), ("Location", "End")),
         _ => Url(baseUrl, Endpoint(op)),
     };
+
+    /// Starts the song at that place of Playing Now (0-based).
+    public static string PlayByIndex(string baseUrl, int index) => Url(baseUrl, "Playback/PlayByIndex", ("Index", index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
     /// "user:password" as the Authorization header's Basic value; null when there is no user.
     public static string? Basic(string? user, string? password) =>
         string.IsNullOrEmpty(user) ? null : Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(user + ":" + password));
 
     /// JRiver's answer to `Playback/Info`.
-    public sealed record Info(bool Ok, bool Has, bool Playing, bool Paused, string Title, string Artist, TimeSpan Position, TimeSpan Length);
+    public sealed record Info(bool Ok, bool Has, bool Playing, bool Paused, string Title, string Artist, TimeSpan Position, TimeSpan Length, int Index = 0, int Tracks = 0);
 
     /// Reads the XML (`<Response Status="OK"><Item Name="State">2</Item>…`): State 2 plays, 1 is paused, 0 is stopped.
     public static Info ParseInfo(string xml)
@@ -152,7 +156,7 @@ internal static class Mcws
             string title = Get("Name");
             if (title.Length == 0) title = Path.GetFileNameWithoutExtension(Get("Filename"));
             bool has = state is 1 or 2 && title.Length > 0;
-            return new Info(true, has, state == 2, state == 1, title, Get("Artist"), Millis(Get("PositionMS")), Millis(Get("DurationMS")));
+            return new Info(true, has, state == 2, state == 1, title, Get("Artist"), Millis(Get("PositionMS")), Millis(Get("DurationMS")), int.TryParse(Get("PlayingNowPosition"), out int at) ? at : 0, int.TryParse(Get("PlayingNowTracks"), out int n) ? n : 0);
         }
         catch (System.Xml.XmlException)
         {

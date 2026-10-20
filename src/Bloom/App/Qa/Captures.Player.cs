@@ -89,8 +89,11 @@ internal static partial class Captures
             await Step("add b", () => MusicPlayer.Enqueue(two));
             await Step("toggle", MusicPlayer.Toggle);
             await Step("toggle", MusicPlayer.Toggle);
-            await Step("next", MusicPlayer.Next);
-            await Step("previous", MusicPlayer.Previous);
+            if (way != PlayerWays.Jriver) // JRiver's next / previous would start the user's own songs around the test file
+            {
+                await Step("next", MusicPlayer.Next);
+                await Step("previous", MusicPlayer.Previous);
+            }
             await Step("stop", MusicPlayer.Stop);
         }
         Settings.Current.PlayerMode = PlayerWays.Direct;

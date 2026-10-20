@@ -205,8 +205,9 @@ internal static class PlayerTests
         Check.Eq(Mcws.Request(B, PlayerOp.Next), B + "Playback/Next?Zone=-1", "next");
         Check.Eq(Mcws.Request(B, PlayerOp.Previous), B + "Playback/Previous?Zone=-1", "previous");
         Check.Eq(Mcws.Request(B, PlayerOp.Stop), B + "Playback/Stop?Zone=-1", "stop");
-        Check.Eq(Mcws.Request(B, PlayerOp.Play, @"C:\Music\a b&c.flac"), B + "Playback/PlayByFilename?Filename=C%3A%5CMusic%5Ca%20b%26c.flac&Zone=-1", "a file: every special character escaped");
-        Check.Eq(Mcws.Request(B, PlayerOp.Add, @"C:\a.flac"), B + "Playback/PlayByFilename?Filename=C%3A%5Ca.flac&Position=End&Zone=-1", "added at the end");
+        Check.Eq(Mcws.Request(B, PlayerOp.Play, @"C:\Music\a b&c.flac"), B + "Playback/PlayByFilename?Filenames=C%3A%5CMusic%5Ca%20b%26c.flac&Location=Next&Zone=-1", "a file: every special character escaped, right after the song on");
+        Check.Eq(Mcws.PlayByIndex(B, 7), B + "Playback/PlayByIndex?Index=7&Zone=-1", "start the song at a place");
+        Check.Eq(Mcws.Request(B, PlayerOp.Add, @"C:\a.flac"), B + "Playback/PlayByFilename?Filenames=C%3A%5Ca.flac&Location=End&Zone=-1", "added at the end");
     }
 
     public static void McwsLoginIsBasic()
@@ -228,6 +229,7 @@ internal static class PlayerTests
         Check.Eq(p.Artist, "Artist", "the artist");
         Check.Eq(p.Position, TimeSpan.FromSeconds(65), "the position");
         Check.Eq(p.Length, TimeSpan.FromSeconds(242.5), "the length");
+        Check.True(Mcws.ParseInfo("""<Response Status="OK"><Item Name="State">0</Item><Item Name="PlayingNowPosition">6</Item><Item Name="PlayingNowTracks">20</Item></Response>""") is { Index: 6, Tracks: 20 }, "the place in Playing Now");
         var paused = Mcws.ParseInfo("""<Response Status="OK"><Item Name="State">1</Item><Item Name="Name">x</Item></Response>""");
         Check.True(paused.Has && paused.Paused && !paused.Playing, "paused still has a song");
         var stopped = Mcws.ParseInfo("""<Response Status="OK"><Item Name="State">0</Item><Item Name="Name">x</Item></Response>""");
